@@ -27,8 +27,7 @@ type Site struct {
 }
 
 func (s *Site) Start() {
-	var store = sessions.NewCookieStore([]byte(os.Getenv("SESSION_KEY")))
-
+	// var store = sessions.NewCookieStore([]byte(os.Getenv("SESSION_KEY")))
 
 	fmt.Printf("Hello world!")
 
