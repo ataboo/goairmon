@@ -35,7 +35,8 @@ func TestServiceProvider(t *testing.T) {
 }
 
 type _fakeContext struct {
-	values map[string]interface{}
+	values     map[string]interface{}
+	fakeWriter *httptest.ResponseRecorder
 }
 
 // Request returns `*http.Request`.
@@ -50,7 +51,13 @@ func (c *_fakeContext) SetRequest(r *http.Request) {
 
 // Response returns `*Response`.
 func (c *_fakeContext) Response() *echo.Response {
-	panic("not implemented")
+	if c.fakeWriter == nil {
+		panic("not implemented")
+	}
+
+	return &echo.Response{
+		Writer: c.fakeWriter,
+	}
 }
 
 // IsTLS returns true if HTTP connection is TLS otherwise false.

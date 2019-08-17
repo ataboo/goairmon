@@ -38,7 +38,7 @@ type SessionStore struct {
 	timeProvider TimeProvider
 }
 
-func (c *Config) expiration() time.Duration {
+func (c *Config) expirationDuration() time.Duration {
 	return time.Duration(c.ExpirationSecs) * time.Second
 }
 
@@ -67,6 +67,10 @@ type Session struct {
 	Id        string
 	StartTime time.Time
 	Values    map[string]string
+}
+
+func (s *Session) IsExpired(deadline time.Time) bool {
+	return deadline.After(s.StartTime)
 }
 
 func (s *SessionStore) StartGC() error {
@@ -116,8 +120,15 @@ func (s *SessionStore) Find(sessionId string) (*Session, error) {
 		return existing, fmt.Errorf("session not found")
 	}
 
+	if existing.IsExpired(s.deadlineTime()) {
+		delete(s.sessions, sessionId)
+		_ = s.idStack.Remove(sessionId)
+		return nil, fmt.Errorf("session not found")
+	}
+
 	_ = s.idStack.Remove(sessionId)
 	s.idStack.PushBack(sessionId)
+	existing.StartTime = s.timeProvider.Now()
 
 	return existing, nil
 }
@@ -150,7 +161,7 @@ func (s *SessionStore) removeExpiredSessions() {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	deadline := s.timeProvider.Now().Add(-s.Config.expiration())
+	deadline := s.deadlineTime()
 
 	for {
 		if s.idStack.Count() == 0 {
@@ -158,18 +169,22 @@ func (s *SessionStore) removeExpiredSessions() {
 		}
 
 		id := s.idStack.Peak()
-		session, ok := s.sessions[id]
+		sess, ok := s.sessions[id]
 		if !ok {
 			log.Errorf("stacked id %s has no corresponding session", id)
 			_, _ = s.idStack.Pop()
 			continue
 		}
 
-		if session.StartTime.After(deadline) {
+		if !sess.IsExpired(deadline) {
 			return
 		}
 
 		delete(s.sessions, id)
 		_, _ = s.idStack.Pop()
 	}
+}
+
+func (s *SessionStore) deadlineTime() time.Time {
+	return s.timeProvider.Now().Add(-s.Config.expirationDuration())
 }

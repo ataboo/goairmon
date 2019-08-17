@@ -79,6 +79,42 @@ func TestFindSession(t *testing.T) {
 	}
 }
 
+func TestRemoveExpiredSessionOnFind(t *testing.T) {
+	store := _sessionSetup()
+	timePro := (store.timeProvider).(*mockTimeProvider)
+	startNow := time.Unix(503539200, 0)
+	timePro.NowCallback = func() time.Time {
+		return startNow
+	}
+
+	store.sessions["first_id"] = &Session{
+		Id:        "expired_session",
+		StartTime: startNow.Add(-store.Config.expirationDuration()),
+	}
+
+	store.idStack.PushBack("first_id")
+
+	sess, err := store.Find("first_id")
+	if err != nil || sess == nil {
+		t.Error("expected to find session")
+	}
+
+	if sess.StartTime != startNow {
+		t.Error("expected start time to be set to now on successful find")
+	}
+
+	store.sessions["first_id"].StartTime = sess.StartTime.Add(-store.Config.expirationDuration() - time.Minute)
+
+	sess, err = store.Find("first_id")
+	if err == nil || sess != nil {
+		t.Error("expected not to find session")
+	}
+
+	if len(store.sessions) != 0 || store.idStack.Count() != 0 {
+		t.Error("expected session to be deleted")
+	}
+}
+
 func TestNewOrExisting(t *testing.T) {
 	store := _sessionSetup()
 	timePro := (store.timeProvider).(*mockTimeProvider)
@@ -170,7 +206,7 @@ func TestRemoveExpiredSessions(t *testing.T) {
 		t.Error(err)
 	}
 
-	startNow = startNow.Add(time.Duration(store.Config.ExpirationSecs) * time.Second)
+	startNow = startNow.Add(store.Config.expirationDuration() + time.Minute)
 
 	if _, err := store.NewOrExisting("second_id", "second_user"); err != nil {
 		t.Error(err)
@@ -195,7 +231,7 @@ func TestGCRemovesSessions(t *testing.T) {
 		t.Error(err)
 	}
 
-	startNow = startNow.Add(time.Duration(store.Config.ExpirationSecs) * time.Second)
+	startNow = startNow.Add(store.Config.expirationDuration() + time.Minute)
 
 	if _, err := store.NewOrExisting("second_id", "second_user"); err != nil {
 		t.Error(err)
@@ -217,7 +253,7 @@ func TestGCRemovesSessions(t *testing.T) {
 
 	_assertSessionStore(store, 1, "second_id", t)
 
-	startNow = startNow.Add(time.Duration(store.Config.ExpirationSecs) * time.Second)
+	startNow = startNow.Add(store.Config.expirationDuration() + time.Minute)
 }
 
 func TestSystemTime(t *testing.T) {
