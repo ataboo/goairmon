@@ -10,10 +10,8 @@ import (
 )
 
 type Config struct {
-	SessionCookieName string
-	SessionKey        string
-	ExpirationSecs    int
-	GCDelaySeconds    int
+	ExpirationSecs int
+	GCDelaySeconds int
 }
 
 func NewSessionStore(cfg Config) *SessionStore {
@@ -89,7 +87,7 @@ func (s *SessionStore) StartGC() error {
 	return nil
 }
 
-func (s *SessionStore) NewOrExisting(sessionId string, userId string) (*Session, error) {
+func (s *SessionStore) NewOrExisting(sessionId string) (*Session, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -105,7 +103,6 @@ func (s *SessionStore) NewOrExisting(sessionId string, userId string) (*Session,
 
 	sess.StartTime = s.timeProvider.Now()
 	s.sessions[sessionId] = sess
-	sess.Values["user_id"] = userId
 	s.idStack.PushBack(sessionId)
 
 	return sess, nil

@@ -16,12 +16,14 @@ func (p *ServiceProvider) Register(key string, service interface{}) {
 	p.bindings[key] = service
 }
 
-func (p *ServiceProvider) BindMiddleware(c echo.Context) echo.MiddlewareFunc {
+func (p *ServiceProvider) BindServices() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		for k, v := range p.bindings {
-			c.Set(k, v)
-		}
+		return func(c echo.Context) error {
+			for k, v := range p.bindings {
+				c.Set(k, v)
+			}
 
-		return next
+			return next(c)
+		}
 	}
 }

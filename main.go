@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	server := site.NewSite(nil)
+	server := site.NewSite()
 	defer cleanup(server)
 
 	server.Start()

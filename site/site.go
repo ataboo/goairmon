@@ -2,47 +2,59 @@ package site
 
 import (
 	"fmt"
+	"goairmon/site/identity"
+	"goairmon/site/middleware"
 	"net/http"
-	"strconv"
+	"os"
 
+	"github.com/joho/godotenv"
 	"github.com/labstack/echo"
-	"github.com/labstack/echo/middleware"
+	echomiddleware "github.com/labstack/echo/middleware"
 )
 
-func NewSite(cfg *Config) *Site {
-	site := Site{config: cfg}
+func NewSite() *Site {
+	identityCfg := identity.DefaultIdentityCfg()
+	identityCfg.CookieStoreKeySession = mustGetEnv("APP_COOKIE_KEY")
+	identityCfg.CookieStoreEncryptionKey = mustGetEnv("COOKIE_STORE_ENCRYPTION")
+
+	site := Site{
+		echoServer: echo.New(),
+		identity:   identity.NewIdentityService(identityCfg),
+	}
 
 	return &site
 }
 
-type Config struct {
-	SessionKey   string
-	DbConnection string
-	Port         int
-}
-
 type Site struct {
-	config     *Config
 	echoServer *echo.Echo
+	identity   *identity.IdentityService
 }
 
 func (s *Site) Start() {
-	// var store = sessions.NewCookieStore([]byte(os.Getenv("SESSION_KEY")))
-
-	fmt.Printf("Hello world!")
+	err := godotenv.Load("../.env")
+	if err != nil {
+		panic("failed to load .env")
+	}
 
 	s.echoServer = echo.New()
 	s.bindGlobalMiddleware()
 	s.bindActions()
 
 	go func() {
-		s.echoServer.Logger.Fatal(s.echoServer.Start(":" + strconv.Itoa(s.config.Port)))
+		s.echoServer.Logger.Fatal(s.echoServer.Start(":" + mustGetEnv("SERVER_PORT")))
 	}()
 }
 
 func (s *Site) bindGlobalMiddleware() {
-	s.echoServer.Use(middleware.Logger())
-	s.echoServer.Use(middleware.Recover())
+	provider := middleware.NewServiceProvider()
+
+	s.identity.RegisterWithProvider(provider)
+
+	s.echoServer.Use(echomiddleware.Logger())
+	s.echoServer.Use(echomiddleware.Recover())
+	s.echoServer.Use(provider.BindServices())
+	s.identity.RegisterWithProvider(provider)
+	s.echoServer.Use(s.identity.LoadCurrentSession())
 }
 
 func (s *Site) bindActions() {
@@ -51,6 +63,31 @@ func (s *Site) bindActions() {
 	s.echoServer.GET("/", func(c echo.Context) error {
 		return c.String(http.StatusOK, "Hello World!\n")
 	})
+
+	authorizeFail := func(c echo.Context) error {
+		return c.String(http.StatusUnauthorized, "you have to log in")
+	}
+	secure := s.echoServer.Group("/secure", s.identity.RequireSession(authorizeFail))
+	secure.GET("/", func(c echo.Context) error {
+		return c.String(http.StatusOK, "Hello Secure World\n")
+	})
+	secure.GET("/login", func(c echo.Context) error {
+
+		return c.String(http.StatusOK, "started session")
+	})
+	secure.GET("/logout", func(c echo.Context) error {
+
+		return nil
+	})
+}
+
+func mustGetEnv(key string) string {
+	val := os.Getenv(key)
+	if val == "" {
+		panic(fmt.Sprintf("Failed to load dotenv value: %s", key))
+	}
+
+	return val
 }
 
 func (s *Site) Cleanup() error {

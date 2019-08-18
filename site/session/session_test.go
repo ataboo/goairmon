@@ -5,17 +5,13 @@ import (
 	"time"
 )
 
-func _assertSessionMatch(session *Session, id string, startTime time.Time, userId string, t *testing.T) {
+func _assertSessionMatch(session *Session, id string, startTime time.Time, t *testing.T) {
 	if session.Id != id {
 		t.Errorf("unnexpected session id: %s, %s", id, session.Id)
 	}
 
 	if session.StartTime != startTime {
 		t.Errorf("unnexpected session start time: %s, %s", startTime, session.StartTime)
-	}
-
-	if session.Values["user_id"] != userId {
-		t.Errorf("unnexpected user id: %s, %s", userId, session.Values["user_id"])
 	}
 }
 
@@ -70,7 +66,7 @@ func TestFindSession(t *testing.T) {
 		t.Error("error when finding session", err)
 	}
 
-	_assertSessionMatch(sess, "first_id", startNow, "first_user", t)
+	_assertSessionMatch(sess, "first_id", startNow, t)
 	_assertSessionStore(store, 2, "first_id", t)
 
 	_, err = store.Find("not_a_match")
@@ -123,26 +119,26 @@ func TestNewOrExisting(t *testing.T) {
 		return startNow
 	}
 
-	sess, err := store.NewOrExisting("first_session", "first_user")
+	sess, err := store.NewOrExisting("first_session")
 	if err != nil {
 		t.Error("unnexpected err", err)
 	}
 
-	_assertSessionMatch(sess, "first_session", startNow, "first_user", t)
+	_assertSessionMatch(sess, "first_session", startNow, t)
 	_assertSessionStore(store, 1, "first_session", t)
 
-	secondSess, err := store.NewOrExisting("second_session", "second_user")
+	secondSess, err := store.NewOrExisting("second_session")
 	if err != nil {
 		t.Error("unnexpected err", err)
 	}
 
-	_assertSessionMatch(secondSess, "second_session", startNow, "second_user", t)
+	_assertSessionMatch(secondSess, "second_session", startNow, t)
 	_assertSessionStore(store, 2, "second_session", t)
 	if store.idStack.Peak() != "first_session" {
 		t.Error("first session should be ontop of stack")
 	}
 
-	sess, err = store.NewOrExisting("first_session", "first_user")
+	sess, err = store.NewOrExisting("first_session")
 	if err != nil {
 		t.Error("unnexpected err", err)
 	}
@@ -151,7 +147,7 @@ func TestNewOrExisting(t *testing.T) {
 		t.Error("second session should be ontop of stack")
 	}
 
-	_assertSessionMatch(sess, "first_session", startNow, "first_user", t)
+	_assertSessionMatch(sess, "first_session", startNow, t)
 	_assertSessionStore(store, 2, "first_session", t)
 }
 
@@ -202,13 +198,13 @@ func TestRemoveExpiredSessions(t *testing.T) {
 		t.Error("id stack should have been cleared")
 	}
 
-	if _, err := store.NewOrExisting("first_id", "first_user"); err != nil {
+	if _, err := store.NewOrExisting("first_id"); err != nil {
 		t.Error(err)
 	}
 
 	startNow = startNow.Add(store.Config.expirationDuration() + time.Minute)
 
-	if _, err := store.NewOrExisting("second_id", "second_user"); err != nil {
+	if _, err := store.NewOrExisting("second_id"); err != nil {
 		t.Error(err)
 	}
 
@@ -227,13 +223,13 @@ func TestGCRemovesSessions(t *testing.T) {
 		return startNow
 	}
 
-	if _, err := store.NewOrExisting("first_id", "first_user"); err != nil {
+	if _, err := store.NewOrExisting("first_id"); err != nil {
 		t.Error(err)
 	}
 
 	startNow = startNow.Add(store.Config.expirationDuration() + time.Minute)
 
-	if _, err := store.NewOrExisting("second_id", "second_user"); err != nil {
+	if _, err := store.NewOrExisting("second_id"); err != nil {
 		t.Error(err)
 	}
 
@@ -279,7 +275,6 @@ func _sessionSetup() *SessionStore {
 		NowCallback: nil,
 	}
 	cfg := Config{
-		SessionKey:     "goairmon_session",
 		ExpirationSecs: 3600,
 		GCDelaySeconds: 600,
 	}
