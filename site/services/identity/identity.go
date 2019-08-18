@@ -2,8 +2,7 @@ package identity
 
 import (
 	"fmt"
-	"goairmon/site/middleware"
-	"goairmon/site/session"
+	"goairmon/site/services/session"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -41,6 +40,10 @@ func DefaultIdentityCfg() *IdentityConfig {
 	}
 }
 
+type ServiceProvider interface {
+	Register(key string, service interface{})
+}
+
 type IdentityConfig struct {
 	CookieStoreKeySession    string
 	CtxKeyCookieStore        string
@@ -70,8 +73,8 @@ func (i *IdentityService) LoadCurrentSession() echo.MiddlewareFunc {
 func (i *IdentityService) RequireSession(onNoSession echo.HandlerFunc) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			session := c.Get(i.Cfg.CtxKeySession)
-			if session == nil {
+			session, ok := c.Get(i.Cfg.CtxKeySession).(*session.Session)
+			if !ok || session == nil {
 				if onNoSession == nil {
 					return c.String(http.StatusUnauthorized, "Please login to access this route")
 				}
@@ -84,7 +87,7 @@ func (i *IdentityService) RequireSession(onNoSession echo.HandlerFunc) echo.Midd
 }
 
 func (i *IdentityService) StartNewSession(c echo.Context) error {
-	session := c.Get(i.Cfg.CtxKeySession)
+	session := c.Get(i.Cfg.CtxKeySession).(*session.Session)
 	if session != nil {
 		return fmt.Errorf("already logged in")
 	}
@@ -112,7 +115,7 @@ func (i *IdentityService) StartNewSession(c echo.Context) error {
 
 func (i *IdentityService) EndSession(c echo.Context) error {
 	session, ok := c.Get(i.Cfg.CtxKeySession).(*session.Session)
-	if !ok {
+	if !ok || session == nil {
 		return fmt.Errorf("already logged out")
 	}
 
@@ -156,7 +159,7 @@ func (i *IdentityService) getSessionFromCookie(c echo.Context) (*session.Session
 	return sessionStore.Find(sessionId)
 }
 
-func (i *IdentityService) RegisterWithProvider(provider *middleware.ServiceProvider) {
+func (i *IdentityService) RegisterWithProvider(provider ServiceProvider) {
 	provider.Register(i.Cfg.CtxKeyCookieStore, i.cookieStore)
 	provider.Register(i.Cfg.CtxKeySessionStore, i.sessionStore)
 }

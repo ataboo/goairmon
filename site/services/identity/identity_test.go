@@ -1,7 +1,7 @@
 package identity
 
 import (
-	"goairmon/site/session"
+	"goairmon/site/services/session"
 	"goairmon/site/testhelpers"
 	"testing"
 
@@ -96,7 +96,7 @@ func TestIdentityMiddleware(t *testing.T) {
 	ctx.Set(service.Cfg.CtxKeySessionStore, sessionStore)
 	ctx.Set(service.Cfg.CtxKeyCookieStore, cookieStore)
 
-	service.LoadCurrentSession()(testhelpers.EmptyHandler)(ctx)
+	_ = service.LoadCurrentSession()(testhelpers.EmptyHandler)(ctx)
 
 	sess := ctx.Get(service.Cfg.CtxKeySession)
 	if sess != newSess {
@@ -123,7 +123,7 @@ func TestRequireSession(t *testing.T) {
 		t.Error("should be returning unauthorized")
 	}
 
-	ctx.Set(service.Cfg.CtxKeySession, session.Session{})
+	ctx.Set(service.Cfg.CtxKeySession, &session.Session{})
 
 	_ = service.RequireSession(nil)(nextHandler)(ctx)
 

@@ -195,7 +195,7 @@ func (c *FakeContext) HTMLBlob(code int, b []byte) error {
 // String sends a string response with status code.
 func (c *FakeContext) String(code int, s string) error {
 	c.Response().Status = code
-	c.Response().Writer.Write([]byte(s))
+	_, _ = c.Response().Writer.Write([]byte(s))
 
 	return nil
 }

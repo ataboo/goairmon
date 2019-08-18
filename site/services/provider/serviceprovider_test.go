@@ -1,4 +1,4 @@
-package middleware
+package provider
 
 import (
 	"goairmon/site/testhelpers"
