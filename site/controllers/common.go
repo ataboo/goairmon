@@ -2,12 +2,16 @@ package controllers
 
 import (
 	"fmt"
-	"goairmon/site/context"
+	"goairmon/site/helper"
 	"goairmon/site/services/flash"
 	"goairmon/site/services/viewloader"
 	"html/template"
 
 	"github.com/labstack/echo"
+)
+
+const (
+	CtxFlashServiceKey = helper.CtxFlashServiceKey
 )
 
 func loadView(viewPath string, c echo.Context) *template.Template {
@@ -20,5 +24,5 @@ func loadView(viewPath string, c echo.Context) *template.Template {
 }
 
 func getFlashService(c echo.Context) *flash.FlashService {
-	return c.Get(context.CtxFlashServiceKey).(*flash.FlashService)
+	return c.Get(CtxFlashServiceKey).(*flash.FlashService)
 }

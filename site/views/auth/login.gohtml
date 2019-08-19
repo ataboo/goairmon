@@ -3,7 +3,7 @@
     <h1>Login</h1>
 
     {{if .Errors.HasErrors "general"}}
-        <strong class="text-danger">{{.Errors "general"}}
+        <strong class="text-danger">{{index .Errors "general"}}</strong>
     {{end}}
 
     <form method="POST">

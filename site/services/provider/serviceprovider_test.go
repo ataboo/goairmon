@@ -25,5 +25,4 @@ func TestServiceProvider(t *testing.T) {
 	if ctx.Get("second_key").(string) != "second_value" {
 		t.Error("expected bound value")
 	}
-
 }

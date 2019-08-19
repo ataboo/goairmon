@@ -137,8 +137,130 @@ func TestRequireSession(t *testing.T) {
 	}
 }
 
+func TestRedirectWithoutSession(t *testing.T) {
+	ctx := &testhelpers.FakeContext{
+		FakeWriter: httptest.NewRecorder(),
+		Values:     make(map[string]interface{}),
+	}
+
+	identity := NewIdentityService(&IdentityConfig{CookieStoreKeySession: "app-key", CookieStoreEncryptionKey: "encryption-key"})
+
+	identity.RedirectUsersWithoutSession("/destinationpath")(testhelpers.EmptyHandler)(ctx)
+
+	if ctx.Response().Status != http.StatusSeeOther {
+		t.Error("unexpected status", ctx.Response().Status)
+	}
+
+	if ctx.RedirectPath != "/destinationpath" {
+		t.Error("unexpected redirect", ctx.RedirectPath)
+	}
+
+	ctx.Set(CtxKeySession, &session.Session{})
+
+	identity.RedirectUsersWithoutSession("/destinationpath2")(func(c echo.Context) error {
+		c.Redirect(200, "/notredirected")
+		return nil
+	})(ctx)
+
+	if ctx.Response().Status != 200 || ctx.RedirectPath != "/notredirected" {
+		t.Error("expected next method call")
+	}
+}
+
+func TestRedirectWithSession(t *testing.T) {
+	ctx := &testhelpers.FakeContext{
+		FakeWriter: httptest.NewRecorder(),
+		Values:     make(map[string]interface{}),
+	}
+
+	ctx.Set(CtxKeySession, &session.Session{})
+
+	identity := NewIdentityService(&IdentityConfig{CookieStoreKeySession: "app-key", CookieStoreEncryptionKey: "encryption-key"})
+	identity.RedirectUsersWithSession("/destinationpath")(testhelpers.EmptyHandler)(ctx)
+
+	if ctx.Response().Status != http.StatusSeeOther {
+		t.Error("unexpected status", ctx.Response().Status)
+	}
+
+	if ctx.RedirectPath != "/destinationpath" {
+		t.Error("unexpected redirect", ctx.RedirectPath)
+	}
+
+	ctx.Set(CtxKeySession, nil)
+
+	identity.RedirectUsersWithSession("/destinationpath2")(func(c echo.Context) error {
+		c.Redirect(200, "/notredirected")
+		return nil
+	})(ctx)
+
+	if ctx.Response().Status != 200 || ctx.RedirectPath != "/notredirected" {
+		t.Error("expected next method call")
+	}
+}
+
+func TestStartNewSession(t *testing.T) {
+	ctx := &testhelpers.FakeContext{
+		FakeWriter: httptest.NewRecorder(),
+		Values:     make(map[string]interface{}),
+	}
+
+	ctx.Set(CtxKeySession, &session.Session{})
+	identity := NewIdentityService(&IdentityConfig{CookieStoreKeySession: "app-key", CookieStoreEncryptionKey: "encryption-key"})
+
+	if err := identity.StartNewSession(ctx); err == nil {
+		t.Error("expected already logged in error: ")
+	}
+
+	ctx.Set(CtxKeySession, nil)
+
+	if err := identity.StartNewSession(ctx); err != nil {
+		t.Error("unexpected error", err)
+	}
+}
+
+func TestEndSession(t *testing.T) {
+	ctx := &testhelpers.FakeContext{
+		FakeWriter: httptest.NewRecorder(),
+		Values:     make(map[string]interface{}),
+	}
+
+	identity := NewIdentityService(&IdentityConfig{CookieStoreKeySession: "app-key", CookieStoreEncryptionKey: "encryption-key"})
+
+	if err := identity.EndSession(ctx); err == nil {
+		t.Error("expected already logged out error: ")
+	}
+
+	ctx.Set(CtxKeySession, &session.Session{})
+
+	if err := identity.EndSession(ctx); err != nil {
+		t.Error("unexpected error", err)
+	}
+}
+
+func TestRegisterServiceProvider(t *testing.T) {
+	provider := &_fakeServiceProvider{make(map[string]interface{})}
+	identity := NewIdentityService(&IdentityConfig{CookieStoreKeySession: "app-key", CookieStoreEncryptionKey: "encryption-key"})
+	identity.RegisterWithProvider(provider)
+
+	if provider.services[CtxKeyCookieStore] != identity.cookieStore {
+		t.Error("mismatch for cookie store")
+	}
+
+	if provider.services[CtxKeySessionStore] != identity.sessionStore {
+		t.Error("mismatch for session store")
+	}
+}
+
 func _assertPanic(t *testing.T) {
 	if r := recover(); r == nil {
 		t.Errorf("The code did not panic")
 	}
+}
+
+type _fakeServiceProvider struct {
+	services map[string]interface{}
+}
+
+func (p *_fakeServiceProvider) Register(key string, service interface{}) {
+	p.services[key] = service
 }

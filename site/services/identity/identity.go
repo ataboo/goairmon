@@ -2,6 +2,7 @@ package identity
 
 import (
 	"fmt"
+	"goairmon/site/helper"
 	"goairmon/site/services/session"
 	"net/http"
 
@@ -12,12 +13,11 @@ import (
 )
 
 const (
-	CtxKeyCookieStore      = "cookie_store"
-	CtxKeySessionStore     = "session_store"
-	CtxKeySession          = "current_session"
-	CtxCookieSession       = "cookie_session"
-	CtxFlashMessages       = "flash_messages"
 	CookiesValueSessionKey = "session_id"
+	CtxCookieSession       = helper.CtxCookieSession
+	CtxKeyCookieStore      = helper.CtxKeyCookieStore
+	CtxKeySession          = helper.CtxKeySession
+	CtxKeySessionStore     = helper.CtxKeySessionStore
 )
 
 func NewIdentityService(cfg *IdentityConfig) *IdentityService {

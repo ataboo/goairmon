@@ -1,18 +1,17 @@
 package flash
 
 import (
-	"goairmon/site/context"
+	"goairmon/site/helper"
 	"goairmon/site/models"
-	"goairmon/site/services/identity"
 
 	"github.com/gorilla/sessions"
 	"github.com/labstack/echo"
 )
 
 const (
-	CookieFlashSuccess = "flash_success"
-	CookieFlashInfo    = "flash_info"
-	CookieFlashDanger  = "flash_danger"
+	CookieFlashBagKey = "flash_bag"
+	CtxCookieSession  = helper.CtxCookieSession
+	CtxFlashMessages  = helper.CtxFlashMessages
 )
 
 type FlashService struct {
@@ -22,8 +21,10 @@ type FlashService struct {
 func (f *FlashService) PopToContext() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			flashBag := f.getBagFromCookie(f.mustGetCookieSession(c), true)
-			c.Set(context.CtxFlashKey, flashBag)
+			cookieSession := f.mustGetCookieSession(c)
+			flashBag := f.getBagFromCookie(cookieSession, true)
+			_ = cookieSession.Save(c.Request(), c.Response().Writer)
+			c.Set(CtxFlashMessages, flashBag)
 
 			return next(c)
 		}
@@ -35,7 +36,7 @@ func (f *FlashService) PushSuccess(c echo.Context, msg string) error {
 	flashBag := f.getBagFromCookie(session, false)
 	flashBag.Success = append(flashBag.Success, msg)
 
-	return session.Save(c.Request(), c.Response().Writer)
+	return f.saveBagToCookie(flashBag, session, c)
 }
 
 func (f *FlashService) PushInfo(c echo.Context, msg string) error {
@@ -43,7 +44,7 @@ func (f *FlashService) PushInfo(c echo.Context, msg string) error {
 	flashBag := f.getBagFromCookie(session, false)
 	flashBag.Info = append(flashBag.Info, msg)
 
-	return session.Save(c.Request(), c.Response().Writer)
+	return f.saveBagToCookie(flashBag, session, c)
 }
 
 func (f *FlashService) PushError(c echo.Context, msg string) error {
@@ -51,29 +52,34 @@ func (f *FlashService) PushError(c echo.Context, msg string) error {
 	flashBag := f.getBagFromCookie(session, false)
 	flashBag.Error = append(flashBag.Error, msg)
 
-	return session.Save(c.Request(), c.Response().Writer)
+	return f.saveBagToCookie(flashBag, session, c)
 }
 
 func (f *FlashService) getBagFromCookie(cookieSession *sessions.Session, delete bool) *models.FlashBag {
-	bag := &models.FlashBag{
-		Success: f.getCookieValue(cookieSession, CookieFlashSuccess, delete),
-		Info:    f.getCookieValue(cookieSession, CookieFlashInfo, delete),
-		Error:   f.getCookieValue(cookieSession, CookieFlashDanger, delete),
-	}
+	raw := f.getCookieValue(cookieSession, CookieFlashBagKey, delete)
+
+	bag := &models.FlashBag{}
+	_ = bag.Decode(raw)
 
 	return bag
 }
 
-func (f *FlashService) mustGetCookieSession(c echo.Context) *sessions.Session {
-	return c.Get(identity.CtxCookieSession).(*sessions.Session)
+func (f *FlashService) saveBagToCookie(bag *models.FlashBag, cookieSession *sessions.Session, c echo.Context) error {
+	cookieSession.Values[CookieFlashBagKey] = bag.Encode()
+
+	return cookieSession.Save(c.Request(), c.Response().Writer)
 }
 
-func (f *FlashService) getCookieValue(cookieSession *sessions.Session, key string, delete bool) []string {
-	var value []string
-	if msgs, ok := cookieSession.Values[key].([]string); ok {
-		value = msgs
+func (f *FlashService) mustGetCookieSession(c echo.Context) *sessions.Session {
+	return c.Get(CtxCookieSession).(*sessions.Session)
+}
+
+func (f *FlashService) getCookieValue(cookieSession *sessions.Session, key string, delete bool) string {
+	var value string
+	if encoded, ok := cookieSession.Values[key].(string); ok {
+		value = encoded
 	} else {
-		value = []string{}
+		value = ""
 	}
 
 	if delete {

@@ -2,14 +2,15 @@ package site
 
 import (
 	"fmt"
-	"goairmon/site/context"
 	"goairmon/site/controllers"
+	"goairmon/site/helper"
 	"goairmon/site/services/flash"
 	"goairmon/site/services/identity"
 	"goairmon/site/services/provider"
 	"goairmon/site/services/viewloader"
 
 	"github.com/labstack/echo"
+	"github.com/labstack/echo/middleware"
 	echomiddleware "github.com/labstack/echo/middleware"
 )
 
@@ -57,8 +58,11 @@ func (s *Site) bindGlobalMiddleware() {
 
 	s.identity.RegisterWithProvider(provider)
 	provider.Register(viewloader.CtxKey, &viewloader.ViewLoader{})
-	provider.Register(context.CtxFlashServiceKey, flashService)
+	provider.Register(helper.CtxFlashServiceKey, flashService)
 
+	s.echoServer.Use(middleware.CSRFWithConfig(middleware.CSRFConfig{
+		TokenLookup: "form:_csrf-token",
+	}))
 	s.echoServer.Use(echomiddleware.Logger())
 	// s.echoServer.Use(echomiddleware.Recover())
 	s.echoServer.Use(provider.BindServices())

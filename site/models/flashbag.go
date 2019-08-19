@@ -1,9 +1,21 @@
 package models
 
+import "encoding/json"
+
 type FlashBag struct {
-	Success []string
-	Info    []string
-	Error   []string
+	Success []string `json:"success"`
+	Info    []string `json:"info"`
+	Error   []string `json:"error"`
+}
+
+func (f *FlashBag) Decode(strVal string) error {
+	return json.Unmarshal([]byte(strVal), f)
+}
+
+func (f *FlashBag) Encode() string {
+	bytes, _ := json.Marshal(f)
+
+	return string(bytes)
 }
 
 func (f *FlashBag) HasSuccess() bool {

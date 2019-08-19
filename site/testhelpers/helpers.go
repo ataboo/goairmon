@@ -13,9 +13,10 @@ import (
 )
 
 type FakeContext struct {
-	Values     map[string]interface{}
-	FakeWriter *httptest.ResponseRecorder
-	response   *echo.Response
+	Values       map[string]interface{}
+	FakeWriter   *httptest.ResponseRecorder
+	response     *echo.Response
+	RedirectPath string
 }
 
 // Request returns `*http.Request`.
@@ -275,7 +276,10 @@ func (c *FakeContext) NoContent(code int) error {
 
 // Redirect redirects the request to a provided URL with status code.
 func (c *FakeContext) Redirect(code int, url string) error {
-	panic("not implemented")
+	c.Response().Status = code
+	c.RedirectPath = url
+
+	return nil
 }
 
 // Error invokes the registered HTTP error handler. Generally used by middleware.
