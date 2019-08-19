@@ -1,0 +1,24 @@
+{{ define "base" }}
+<html>
+<head>
+    <title>{{block "title" .}} {{end}}</title>
+    {{block "style" .}} {{end}}
+</head>
+<body>
+    <body>
+        <div class="container">
+
+        {{if .FlashBag.HasSuccess }}
+            <strong>Has success!</strong>
+        {{end}}
+
+
+        {{template "content" .}}
+        </div>
+    </body>
+    <footer>{{block "footer" .}} {{end}}</footer>
+    {{block "js" .}} {{end}}
+</body>
+</html>
+
+{{ end }}

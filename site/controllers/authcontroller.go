@@ -1,43 +1,52 @@
 package controllers
 
 import (
-	"html/template"
-	"os"
-	"strings"
+	"goairmon/site/models"
+	"goairmon/site/services/identity"
+	"log"
+	"net/http"
 
 	"github.com/labstack/echo"
 )
 
-func NewAuthController() Controller {
-
-}
-
-type AuthController struct {
-}
-
-func (a *AuthController) Group(server echo.Echo) *echo.Group {
+func AuthController(server *echo.Echo, identity *identity.IdentityService) *echo.Group {
 	group := server.Group("auth")
 	group.GET("/login", func(c echo.Context) error {
-		view := loadView("auth/login.tmpl", c)
+		view := loadView("auth/login.gohtml", c)
 
-	})
+		return view.Execute(c.Response().Writer, models.NewContextVm(c, nil))
+	}, identity.RedirectUsersWithSession("/"))
 
-	return group
-}
+	group.POST("/login", func(c echo.Context) error {
+		loginVm := models.UnmarshalLoginVm(c)
 
-func siteRoot() string {
-	for i := 0; i < 10; i++ {
-		dir, _ := os.Getwd()
-		if strings.HasSuffix(dir, "/site") {
-			return dir
+		if loginVm.Username == "ataboo" && loginVm.Password == "asdfasdf" {
+			_ = identity.StartNewSession(c)
+			err := getFlashService(c).PushSuccess(c, "Successfully logged in!")
+			if err != nil {
+				log.Println(err)
+			}
+
+			return c.Redirect(http.StatusSeeOther, "/")
 		}
 
-		dir = "../" + dir
-	}
+		view := loadView("auth/login.gohtml", c)
+		vm := models.NewContextVm(c, loginVm)
+		vm.Errors["general"] = "Invalid username or password"
 
-	panic("failed to find site root")
-}
+		return view.Execute(c.Response().Writer, vm)
+	}, identity.RedirectUsersWithSession("/"))
 
-func loadView(viewPath string, c echo.Context) *template.Template {
-	template.ParseFiles(viewPath)
+	group.POST("/logout", func(c echo.Context) error {
+		_ = identity.EndSession(c)
+
+		returnPath := c.FormValue("referer")
+		if returnPath == "" {
+			returnPath = "/"
+		}
+
+		return c.Redirect(http.StatusSeeOther, returnPath)
+	}, identity.RedirectUsersWithoutSession("/"))
+
+	return group
 }

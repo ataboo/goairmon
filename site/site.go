@@ -2,10 +2,12 @@ package site
 
 import (
 	"fmt"
+	"goairmon/site/context"
+	"goairmon/site/controllers"
+	"goairmon/site/services/flash"
 	"goairmon/site/services/identity"
 	"goairmon/site/services/provider"
-	"log"
-	"net/http"
+	"goairmon/site/services/viewloader"
 
 	"github.com/labstack/echo"
 	echomiddleware "github.com/labstack/echo/middleware"
@@ -51,48 +53,22 @@ func (s *Site) Cleanup() error {
 
 func (s *Site) bindGlobalMiddleware() {
 	provider := provider.NewServiceProvider()
+	flashService := &flash.FlashService{}
 
 	s.identity.RegisterWithProvider(provider)
+	provider.Register(viewloader.CtxKey, &viewloader.ViewLoader{})
+	provider.Register(context.CtxFlashServiceKey, flashService)
 
 	s.echoServer.Use(echomiddleware.Logger())
 	// s.echoServer.Use(echomiddleware.Recover())
 	s.echoServer.Use(provider.BindServices())
 	s.echoServer.Use(s.identity.LoadCurrentSession())
+	s.echoServer.Use(flashService.PopToContext())
 }
 
 func (s *Site) bindActions() {
 	s.echoServer.Static("/static", "assets")
 
-	s.echoServer.GET("/", func(c echo.Context) error {
-		return c.String(http.StatusOK, "Hello World!\n")
-	})
-
-	//TODO: change me to post
-	s.echoServer.GET("/login", func(c echo.Context) error {
-		err := s.identity.StartNewSession(c)
-		if err != nil {
-			log.Println("failed to login:", err)
-			return c.String(http.StatusUnauthorized, "failed to log in")
-		}
-
-		return c.String(http.StatusOK, "started session")
-	})
-
-	//TODO: change me to post
-	s.echoServer.GET("/logout", func(c echo.Context) error {
-		err := s.identity.EndSession(c)
-		if err != nil {
-			log.Println("failed to logout:", err)
-			return c.String(http.StatusUnauthorized, "failed to log out")
-		}
-
-		return c.String(http.StatusOK, "ended session")
-	})
-
-	secure := s.echoServer.Group("/secure", s.identity.RequireSession(func(c echo.Context) error {
-		return c.String(http.StatusUnauthorized, "you have to log in")
-	}))
-	secure.GET("", func(c echo.Context) error {
-		return c.String(http.StatusOK, "Hello Secure World\n")
-	})
+	controllers.HomeController(s.echoServer, s.identity)
+	controllers.AuthController(s.echoServer, s.identity)
 }

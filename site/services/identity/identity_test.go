@@ -18,8 +18,8 @@ func TestPanicWhenNoSessionStore(t *testing.T) {
 	service := NewIdentityService(nil)
 
 	ctx := &testhelpers.FakeContext{Values: make(map[string]interface{})}
-	ctx.Set(service.Cfg.CtxKeyCookieStore, &sessions.CookieStore{})
-	_, _ = service.getSessionFromCookie(ctx)
+	ctx.Set(CtxKeyCookieStore, &sessions.CookieStore{})
+	_ = service.storeSessionsInContext(ctx)
 }
 
 func TestPanicWhenNoCookieStore(t *testing.T) {
@@ -28,20 +28,24 @@ func TestPanicWhenNoCookieStore(t *testing.T) {
 	service := NewIdentityService(nil)
 
 	ctx := &testhelpers.FakeContext{Values: make(map[string]interface{})}
-	ctx.Set(service.Cfg.CtxKeySessionStore, &session.SessionStore{})
-	_, _ = service.getSessionFromCookie(ctx)
+	ctx.Set(CtxKeySessionStore, &session.SessionStore{})
+	_ = service.storeSessionsInContext(ctx)
 }
 
-func TestErrorWhenNoSession(t *testing.T) {
+func TestCreatesNewCookieSession(t *testing.T) {
 	service := NewIdentityService(nil)
 
-	ctx := &testhelpers.FakeContext{Values: make(map[string]interface{})}
-	ctx.Set(service.Cfg.CtxKeySessionStore, &session.SessionStore{})
-	ctx.Set(service.Cfg.CtxKeyCookieStore, sessions.NewCookieStore([]byte("cookie-encryption")))
+	ctx := &testhelpers.FakeContext{Values: make(map[string]interface{}), FakeWriter: httptest.NewRecorder()}
+	ctx.Set(CtxKeySessionStore, &session.SessionStore{})
+	ctx.Set(CtxKeyCookieStore, sessions.NewCookieStore([]byte("cookie-encryption")))
 
-	_, err := service.getSessionFromCookie(ctx)
-	if err == nil {
-		t.Error("expected error")
+	err := service.storeSessionsInContext(ctx)
+	if err != nil {
+		t.Error("unexpected error")
+	}
+
+	if ctx.Get(CtxCookieSession).(*sessions.Session) == nil {
+		t.Error("expected cookie session to be saved")
 	}
 }
 
@@ -54,31 +58,32 @@ func TestErrorWhenSessionIdNotFoundInSessionStore(t *testing.T) {
 	cookieStore := &testhelpers.FakeCookieStore{Sessions: make(map[string]*sessions.Session)}
 	cookieSession, _ := cookieStore.New(nil, service.Cfg.CookieStoreKeySession)
 
-	ctx.Set(service.Cfg.CtxKeySessionStore, sessionStore)
-	ctx.Set(service.Cfg.CtxKeyCookieStore, cookieStore)
+	ctx.Set(CtxKeySessionStore, sessionStore)
+	ctx.Set(CtxKeyCookieStore, cookieStore)
 
-	_, err := service.getSessionFromCookie(ctx)
-	if err == nil {
-		t.Error("expected error")
+	if cookieSess, ok := ctx.Get(CtxCookieSession).(*sessions.Session); ok && cookieSess != nil {
+		t.Error("expected no cookie session")
 	}
 
-	cookieSession.Values[service.Cfg.CookiesValueSessionKey] = "first_session_id"
+	if sess, ok := ctx.Get(CtxKeySession).(*session.Session); ok && sess != nil {
+		t.Error("expected no session in context")
+	}
+
+	cookieSession.Values[CookiesValueSessionKey] = "first_session_id"
 	_ = cookieStore.Save(nil, nil, cookieSession)
 
-	_, err = service.getSessionFromCookie(ctx)
-	if err == nil {
-		t.Error("expected error")
+	_ = service.storeSessionsInContext(ctx)
+
+	if ctx.Get(CtxKeySession).(*session.Session) != nil {
+		t.Error("expected no session in context")
 	}
 
 	newSess, _ := sessionStore.NewOrExisting("first_session_id")
 
-	sess, err := service.getSessionFromCookie(ctx)
-	if err != nil {
-		t.Error("unexpected error", err)
-	}
+	_ = service.storeSessionsInContext(ctx)
 
-	if sess != newSess {
-		t.Error("expected matching sessions", sess, newSess)
+	if ctx.Get(CtxKeySession).(*session.Session) != newSess {
+		t.Error("expected session to be stored in context")
 	}
 }
 
@@ -90,15 +95,15 @@ func TestIdentityMiddleware(t *testing.T) {
 	sessionStore := session.NewSessionStore(cfg)
 	cookieStore := &testhelpers.FakeCookieStore{Sessions: make(map[string]*sessions.Session)}
 	cookieSession, _ := cookieStore.New(nil, service.Cfg.CookieStoreKeySession)
-	cookieSession.Values[service.Cfg.CookiesValueSessionKey] = "first_session_id"
+	cookieSession.Values[CookiesValueSessionKey] = "first_session_id"
 	_ = cookieStore.Save(nil, nil, cookieSession)
 	newSess, _ := sessionStore.NewOrExisting("first_session_id")
-	ctx.Set(service.Cfg.CtxKeySessionStore, sessionStore)
-	ctx.Set(service.Cfg.CtxKeyCookieStore, cookieStore)
+	ctx.Set(CtxKeySessionStore, sessionStore)
+	ctx.Set(CtxKeyCookieStore, cookieStore)
 
 	_ = service.LoadCurrentSession()(testhelpers.EmptyHandler)(ctx)
 
-	sess := ctx.Get(service.Cfg.CtxKeySession)
+	sess := ctx.Get(CtxKeySession)
 	if sess != newSess {
 		t.Error("expected matching sessions")
 	}
@@ -123,7 +128,7 @@ func TestRequireSession(t *testing.T) {
 		t.Error("should be returning unauthorized")
 	}
 
-	ctx.Set(service.Cfg.CtxKeySession, &session.Session{})
+	ctx.Set(CtxKeySession, &session.Session{})
 
 	_ = service.RequireSession(nil)(nextHandler)(ctx)
 

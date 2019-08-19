@@ -1,0 +1,14 @@
+{{define "title"}}Go Air Mon{{end}}
+{{define "content"}}
+    <h1>Go Air Mon</h1>
+
+    {{if .Session}}
+        <div>Logged in with session {{.Session.Id}}</div>
+        <form action="auth/logout" method="POST">
+            <input type="submit" value="Logout" class="btn btn-primary"/>
+            <input type="hidden" name="referer" value="/"/>
+        </form>
+    {{else}}
+        <div>Not logged in</div>
+    {{end}}
+{{end}}

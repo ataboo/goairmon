@@ -11,6 +11,15 @@ import (
 	"github.com/labstack/echo"
 )
 
+const (
+	CtxKeyCookieStore      = "cookie_store"
+	CtxKeySessionStore     = "session_store"
+	CtxKeySession          = "current_session"
+	CtxCookieSession       = "cookie_session"
+	CtxFlashMessages       = "flash_messages"
+	CookiesValueSessionKey = "session_id"
+)
+
 func NewIdentityService(cfg *IdentityConfig) *IdentityService {
 	if cfg == nil {
 		cfg = DefaultIdentityCfg()
@@ -32,10 +41,6 @@ func NewIdentityService(cfg *IdentityConfig) *IdentityService {
 func DefaultIdentityCfg() *IdentityConfig {
 	return &IdentityConfig{
 		CookieStoreKeySession:    "gowebapp_session",
-		CookiesValueSessionKey:   "session_id",
-		CtxKeyCookieStore:        "cookie_store",
-		CtxKeySessionStore:       "session_store",
-		CtxKeySession:            "current_session",
 		CookieStoreEncryptionKey: "cookie-secret",
 	}
 }
@@ -46,10 +51,6 @@ type ServiceProvider interface {
 
 type IdentityConfig struct {
 	CookieStoreKeySession    string
-	CtxKeyCookieStore        string
-	CtxKeySessionStore       string
-	CtxKeySession            string
-	CookiesValueSessionKey   string
 	CookieStoreEncryptionKey string
 }
 
@@ -62,8 +63,9 @@ type IdentityService struct {
 func (i *IdentityService) LoadCurrentSession() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			var session, _ = i.getSessionFromCookie(c)
-			c.Set(i.Cfg.CtxKeySession, session)
+			if err := i.storeSessionsInContext(c); err != nil {
+				return err
+			}
 
 			return next(c)
 		}
@@ -73,7 +75,7 @@ func (i *IdentityService) LoadCurrentSession() echo.MiddlewareFunc {
 func (i *IdentityService) RequireSession(onNoSession echo.HandlerFunc) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			session, ok := c.Get(i.Cfg.CtxKeySession).(*session.Session)
+			session, ok := c.Get(CtxKeySession).(*session.Session)
 			if !ok || session == nil {
 				if onNoSession == nil {
 					return c.String(http.StatusUnauthorized, "Please login to access this route")
@@ -86,9 +88,35 @@ func (i *IdentityService) RequireSession(onNoSession echo.HandlerFunc) echo.Midd
 	}
 }
 
+func (i *IdentityService) RedirectUsersWithoutSession(redirectPath string) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			session, ok := c.Get(CtxKeySession).(*session.Session)
+			if ok && session != nil {
+				return next(c)
+			}
+
+			return c.Redirect(http.StatusSeeOther, redirectPath)
+		}
+	}
+}
+
+func (i *IdentityService) RedirectUsersWithSession(redirectPath string) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			session, ok := c.Get(CtxKeySession).(*session.Session)
+			if !ok || session == nil {
+				return next(c)
+			}
+
+			return c.Redirect(http.StatusSeeOther, redirectPath)
+		}
+	}
+}
+
 func (i *IdentityService) StartNewSession(c echo.Context) error {
-	session := c.Get(i.Cfg.CtxKeySession).(*session.Session)
-	if session != nil {
+	session, ok := c.Get(CtxKeySession).(*session.Session)
+	if ok && session != nil {
 		return fmt.Errorf("already logged in")
 	}
 
@@ -97,14 +125,14 @@ func (i *IdentityService) StartNewSession(c echo.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to make new session: %s", err)
 	}
-	c.Set(i.Cfg.CtxKeySession, session)
+	c.Set(CtxKeySession, session)
 
 	cookieSession, err := i.cookieStore.Get(c.Request(), i.Cfg.CookieStoreKeySession)
 	if err != nil {
 		return fmt.Errorf("failed to add session cookie: %s", err)
 	}
 
-	cookieSession.Values[i.Cfg.CookiesValueSessionKey] = sessionId.String()
+	cookieSession.Values[CookiesValueSessionKey] = sessionId.String()
 	err = cookieSession.Save(c.Request(), c.Response().Writer)
 	if err != nil {
 		return fmt.Errorf("failed to save session cookie: %s", err)
@@ -114,7 +142,7 @@ func (i *IdentityService) StartNewSession(c echo.Context) error {
 }
 
 func (i *IdentityService) EndSession(c echo.Context) error {
-	session, ok := c.Get(i.Cfg.CtxKeySession).(*session.Session)
+	session, ok := c.Get(CtxKeySession).(*session.Session)
 	if !ok || session == nil {
 		return fmt.Errorf("already logged out")
 	}
@@ -125,7 +153,7 @@ func (i *IdentityService) EndSession(c echo.Context) error {
 		return fmt.Errorf("failed to get session cookie: %s", err)
 	}
 
-	cookieSession.Values[i.Cfg.CookiesValueSessionKey] = nil
+	cookieSession.Values[CookiesValueSessionKey] = nil
 
 	err = cookieSession.Save(c.Request(), c.Response().Writer)
 	if err != nil {
@@ -135,31 +163,39 @@ func (i *IdentityService) EndSession(c echo.Context) error {
 	return nil
 }
 
-func (i *IdentityService) getSessionFromCookie(c echo.Context) (*session.Session, error) {
-	cookieStore, ok := c.Get(i.Cfg.CtxKeyCookieStore).(gorilla.Store)
+func (i *IdentityService) storeSessionsInContext(c echo.Context) error {
+	cookieStore, ok := c.Get(CtxKeyCookieStore).(gorilla.Store)
 	if !ok {
 		panic("failed to find cookie store in context")
 	}
 
-	sessionStore, ok := c.Get(i.Cfg.CtxKeySessionStore).(*session.SessionStore)
+	sessionStore, ok := c.Get(CtxKeySessionStore).(*session.SessionStore)
 	if !ok {
 		panic("failed to find session store in context")
 	}
 
 	cookieSession, err := cookieStore.Get(c.Request(), i.Cfg.CookieStoreKeySession)
-	if err != nil || cookieSession.IsNew {
-		return nil, fmt.Errorf("failed to get an existing cookie session")
+	if err != nil {
+		return fmt.Errorf("failed to get cookie session")
+	}
+	if cookieSession.IsNew {
+		if err = cookieSession.Save(c.Request(), c.Response().Writer); err != nil {
+			return fmt.Errorf("failed to start new cookie session")
+		}
 	}
 
-	sessionId, ok := cookieSession.Values[i.Cfg.CookiesValueSessionKey].(string)
-	if !ok {
-		return nil, fmt.Errorf("cookie does not contain a session id")
+	c.Set(CtxCookieSession, cookieSession)
+
+	sessionId, ok := cookieSession.Values[CookiesValueSessionKey].(string)
+	if ok {
+		sess, _ := sessionStore.Find(sessionId)
+		c.Set(CtxKeySession, sess)
 	}
 
-	return sessionStore.Find(sessionId)
+	return nil
 }
 
 func (i *IdentityService) RegisterWithProvider(provider ServiceProvider) {
-	provider.Register(i.Cfg.CtxKeyCookieStore, i.cookieStore)
-	provider.Register(i.Cfg.CtxKeySessionStore, i.sessionStore)
+	provider.Register(CtxKeyCookieStore, i.cookieStore)
+	provider.Register(CtxKeySessionStore, i.sessionStore)
 }
