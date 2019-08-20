@@ -60,18 +60,20 @@ func (s *Site) bindGlobalMiddleware() {
 	provider.Register(viewloader.CtxKey, &viewloader.ViewLoader{})
 	provider.Register(helper.CtxFlashServiceKey, flashService)
 
-	s.echoServer.Use(middleware.CSRFWithConfig(middleware.CSRFConfig{
-		TokenLookup: "form:_csrf-token",
-	}))
 	s.echoServer.Use(echomiddleware.Logger())
 	// s.echoServer.Use(echomiddleware.Recover())
 	s.echoServer.Use(provider.BindServices())
 	s.echoServer.Use(s.identity.LoadCurrentSession())
 	s.echoServer.Use(flashService.PopToContext())
+	s.echoServer.Use(middleware.CSRFWithConfig(middleware.CSRFConfig{
+		TokenLookup: "form:_csrf-token",
+	}))
+
 }
 
 func (s *Site) bindActions() {
-	s.echoServer.Static("/static", "assets")
+	s.echoServer.Static("/static", "site/assets")
+	s.echoServer.File("favicon.ico", "site/assets/imgs/favicon.ico")
 
 	controllers.HomeController(s.echoServer, s.identity)
 	controllers.AuthController(s.echoServer, s.identity)

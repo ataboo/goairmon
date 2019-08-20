@@ -145,7 +145,7 @@ func TestRedirectWithoutSession(t *testing.T) {
 
 	identity := NewIdentityService(&IdentityConfig{CookieStoreKeySession: "app-key", CookieStoreEncryptionKey: "encryption-key"})
 
-	identity.RedirectUsersWithoutSession("/destinationpath")(testhelpers.EmptyHandler)(ctx)
+	_ = identity.RedirectUsersWithoutSession("/destinationpath")(testhelpers.EmptyHandler)(ctx)
 
 	if ctx.Response().Status != http.StatusSeeOther {
 		t.Error("unexpected status", ctx.Response().Status)
@@ -157,9 +157,8 @@ func TestRedirectWithoutSession(t *testing.T) {
 
 	ctx.Set(CtxKeySession, &session.Session{})
 
-	identity.RedirectUsersWithoutSession("/destinationpath2")(func(c echo.Context) error {
-		c.Redirect(200, "/notredirected")
-		return nil
+	_ = identity.RedirectUsersWithoutSession("/destinationpath2")(func(c echo.Context) error {
+		return c.Redirect(200, "/notredirected")
 	})(ctx)
 
 	if ctx.Response().Status != 200 || ctx.RedirectPath != "/notredirected" {
@@ -176,7 +175,7 @@ func TestRedirectWithSession(t *testing.T) {
 	ctx.Set(CtxKeySession, &session.Session{})
 
 	identity := NewIdentityService(&IdentityConfig{CookieStoreKeySession: "app-key", CookieStoreEncryptionKey: "encryption-key"})
-	identity.RedirectUsersWithSession("/destinationpath")(testhelpers.EmptyHandler)(ctx)
+	_ = identity.RedirectUsersWithSession("/destinationpath")(testhelpers.EmptyHandler)(ctx)
 
 	if ctx.Response().Status != http.StatusSeeOther {
 		t.Error("unexpected status", ctx.Response().Status)
@@ -188,9 +187,8 @@ func TestRedirectWithSession(t *testing.T) {
 
 	ctx.Set(CtxKeySession, nil)
 
-	identity.RedirectUsersWithSession("/destinationpath2")(func(c echo.Context) error {
-		c.Redirect(200, "/notredirected")
-		return nil
+	_ = identity.RedirectUsersWithSession("/destinationpath2")(func(c echo.Context) error {
+		return c.Redirect(200, "/notredirected")
 	})(ctx)
 
 	if ctx.Response().Status != 200 || ctx.RedirectPath != "/notredirected" {

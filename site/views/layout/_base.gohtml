@@ -3,17 +3,38 @@
 <head>
     <title>{{block "title" .}} {{end}}</title>
     {{block "style" .}} {{end}}
+
+    <nav class="navbar navbar-dark bg-dark">
+        <a class="navbar-brand col-sm-3 col-md-2 mr-0" href="/">GoAirMon</a>
+
+        {{if .Session}}
+        <form class="form-inline my-0" action="auth/logout" method="POST">
+            <button class="btn btn-outline-success my-2 my-sm-0" type="submit">Logout</button>
+        </form>
+        {{end}}
+    </nav>
 </head>
 <body>
     <body>
-        <div class="container">
+        <div class="container-fluid">
+            <div class="row">
+            <nav class="col-md-2 d-none d-md-block bg-secondary sidebar">
+                <div class="sidebar-sticky">
+                    <ul class="nav flex-column">
+                    </ul>
+                </div>
+            </nav>
 
-        {{if .FlashBag.HasSuccess }}
-            <strong>Has success!</strong>
-        {{end}}
+                <main class="col-md-9 ml-sm-auto col-lg-10 pt-3 px-4" role="main">
+
+                {{if .FlashBag.HasSuccess }}
+                    <strong>Has success!</strong>
+                {{end}}
 
 
-        {{template "content" .}}
+                {{template "content" .}}
+                </main>
+            </div>
         </div>
     </body>
     <footer>{{block "footer" .}} {{end}}</footer>

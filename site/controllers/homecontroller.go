@@ -8,12 +8,12 @@ import (
 )
 
 func HomeController(server *echo.Echo, identity *identity.IdentityService) *echo.Group {
-	group := server.Group("", identity.RedirectUsersWithoutSession("/auth/login"))
+	group := server.Group("")
 	group.GET("/", func(c echo.Context) error {
 		view := loadView("home/index.gohtml", c)
 
 		return view.Execute(c.Response().Writer, models.NewContextVm(c, nil))
-	})
+	}, identity.RedirectUsersWithoutSession("/auth/login"))
 
 	return group
 }
