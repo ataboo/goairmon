@@ -1,7 +1,7 @@
 package identity
 
 import (
-	"goairmon/site/services/session"
+	"goairmon/business/services/session"
 	"goairmon/site/testhelpers"
 	"testing"
 

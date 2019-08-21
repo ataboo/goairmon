@@ -2,9 +2,9 @@ package controllers
 
 import (
 	"fmt"
+	"goairmon/business/services/flash"
+	"goairmon/business/services/viewloader"
 	"goairmon/site/helper"
-	"goairmon/site/services/flash"
-	"goairmon/site/services/viewloader"
 	"html/template"
 
 	"github.com/labstack/echo"

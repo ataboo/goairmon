@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"goairmon/site"
-	"os"
+	"goairmon/site/helper"
 
 	"github.com/joho/godotenv"
 )
@@ -18,9 +18,9 @@ func main() {
 	}
 
 	serverCfg := &site.Config{
-		Address:               mustGetEnv("SERVER_ADDRESS"),
-		AppCookieKey:          mustGetEnv("APP_COOKIE_KEY"),
-		CookieStoreEncryption: mustGetEnv("COOKIE_STORE_ENCRYPTION"),
+		Address:               helper.MustGetEnv("SERVER_ADDRESS"),
+		AppCookieKey:          helper.MustGetEnv("APP_COOKIE_KEY"),
+		CookieStoreEncryption: helper.MustGetEnv("COOKIE_STORE_ENCRYPTION"),
 	}
 
 	server.Start(serverCfg)
@@ -32,13 +32,4 @@ func cleanup(server *site.Site) {
 	if err := server.Cleanup(); err != nil {
 		fmt.Print(err)
 	}
-}
-
-func mustGetEnv(key string) string {
-	val := os.Getenv(key)
-	if val == "" {
-		panic(fmt.Sprintf("Failed to load dotenv value: %s", key))
-	}
-
-	return val
 }

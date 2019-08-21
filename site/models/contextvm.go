@@ -2,7 +2,7 @@ package models
 
 import (
 	"goairmon/site/helper"
-	"goairmon/site/services/session"
+	"goairmon/business/services/session"
 
 	"github.com/labstack/echo"
 )
