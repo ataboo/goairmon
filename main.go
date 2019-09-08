@@ -9,11 +9,7 @@ import (
 )
 
 func main() {
-	server := site.NewSite()
-	defer cleanup(server)
-
-	err := godotenv.Load(".env")
-	if err != nil {
+	if err := godotenv.Load(".env"); err != nil {
 		panic("failed to load .env")
 	}
 
@@ -24,7 +20,10 @@ func main() {
 		StoragePath:           helper.MustGetEnv("STORAGE_PATH"),
 	}
 
-	server.Start(serverCfg)
+	server := site.NewSite(serverCfg)
+	defer cleanup(server)
+
+	server.Start()
 
 	select {}
 }

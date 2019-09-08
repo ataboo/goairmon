@@ -2,6 +2,7 @@ package context
 
 import (
 	"goairmon/business/data/models"
+	"io/ioutil"
 	"os"
 	"testing"
 
@@ -10,7 +11,7 @@ import (
 
 func _setupMemDbContext(t *testing.T) *memDbContext {
 	ctx := NewMemDbContext(&MemDbConfig{
-		StoragePath: "/tmp",
+		StoragePath: "/tmp/goairmon_testing",
 	})
 
 	memCtx := ctx.(*memDbContext)
@@ -25,8 +26,7 @@ func TestCreateUser(t *testing.T) {
 	ctx := _setupMemDbContext(t)
 
 	user := &models.User{
-		Username:     "test-username",
-		PasswordHash: "supersecret",
+		Username: "test-username",
 	}
 
 	if user.ID != uuid.Nil {
@@ -60,14 +60,12 @@ func TestUpdateExistingUser(t *testing.T) {
 	ctx := _setupMemDbContext(t)
 
 	user1 := &models.User{
-		ID:           uuid.New(),
-		Username:     "test-username",
-		PasswordHash: "supersecret",
+		ID:       uuid.New(),
+		Username: "test-username",
 	}
 	user2 := &models.User{
-		ID:           uuid.New(),
-		Username:     "test-username2",
-		PasswordHash: "supersecret2",
+		ID:       uuid.New(),
+		Username: "test-username2",
 	}
 
 	ctx.users[user1.ID] = user1.CopyTo(&models.User{})
@@ -95,8 +93,7 @@ func TestUpdateExistingUser(t *testing.T) {
 func TestSaveAndLoad(t *testing.T) {
 	ctx := _setupMemDbContext(t)
 	user := &models.User{
-		Username:     "test-username",
-		PasswordHash: "supersecret",
+		Username: "test-username",
 	}
 
 	ctx.CreateOrUpdateUser(user)
@@ -120,7 +117,7 @@ func TestSaveAndLoad(t *testing.T) {
 		t.Error(err)
 	}
 
-	if result.Username != user.Username || result.ID != user.ID || result.PasswordHash != user.PasswordHash || result.LastLogin != user.LastLogin {
+	if result.Username != user.Username || result.ID != user.ID {
 		t.Errorf("User mismatch: %+v, %+v", user, result)
 	}
 }
@@ -128,12 +125,10 @@ func TestSaveAndLoad(t *testing.T) {
 func TestFindByName(t *testing.T) {
 	ctx := _setupMemDbContext(t)
 	user1 := &models.User{
-		Username:     "first-user",
-		PasswordHash: "supersecret",
+		Username: "first-user",
 	}
 	user2 := &models.User{
-		Username:     "second-user",
-		PasswordHash: "supersecret",
+		Username: "second-user",
 	}
 
 	ctx.CreateOrUpdateUser(user1)
@@ -166,14 +161,12 @@ func TestFindByName(t *testing.T) {
 func TestDeleteUser(t *testing.T) {
 	ctx := _setupMemDbContext(t)
 	user1 := &models.User{
-		ID:           uuid.New(),
-		Username:     "first-user",
-		PasswordHash: "supersecret",
+		ID:       uuid.New(),
+		Username: "first-user",
 	}
 	user2 := &models.User{
-		ID:           uuid.New(),
-		Username:     "second-user",
-		PasswordHash: "supersecret",
+		ID:       uuid.New(),
+		Username: "second-user",
 	}
 
 	ctx.users[user1.ID] = user1
@@ -194,4 +187,32 @@ func TestDeleteUser(t *testing.T) {
 	if err := ctx.DeleteUser(user2.ID); err == nil {
 		t.Error("expected error")
 	}
+}
+
+func TestLoadInvalidFile(t *testing.T) {
+	ctx := _setupMemDbContext(t)
+	if err := ioutil.WriteFile(ctx.userFile(), []byte("garbagedata"), 0644); err != nil {
+		t.Error(err)
+	}
+
+	if err := ctx.load(); err == nil {
+		t.Error("expected error")
+	}
+
+	if ctx.users == nil || len(ctx.users) != 0 {
+		t.Error("expected empty users map set")
+	}
+}
+
+func TestSaveInvalidData(t *testing.T) {
+	ctx := _setupMemDbContext(t)
+	ctx.users = nil
+
+	os.Remove(ctx.userFile())
+	os.MkdirAll(ctx.userFile(), 0700)
+	if err := ctx.save(); err == nil {
+		t.Error("expected error on save")
+	}
+
+	os.Remove(ctx.userFile())
 }

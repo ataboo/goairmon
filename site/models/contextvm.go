@@ -1,8 +1,8 @@
 package models
 
 import (
-	"goairmon/site/helper"
 	"goairmon/business/services/session"
+	"goairmon/site/helper"
 
 	"github.com/labstack/echo"
 )
@@ -17,9 +17,14 @@ func NewContextVm(c echo.Context, viewModel interface{}) *ContextVm {
 	sess, _ := c.Get(CtxKeySession).(*session.Session)
 	flashBag, _ := c.Get(CtxFlashMessages).(*FlashBag)
 	csrfToken := c.Get("csrf").(string)
+	userName := ""
+	if sess != nil {
+		userName = sess.Values["user_name"]
+	}
 
 	return &ContextVm{
 		Session:   sess,
+		UserName:  userName,
 		ViewModel: viewModel,
 		Errors:    ErrorBag{},
 		FlashBag:  flashBag,
@@ -29,6 +34,7 @@ func NewContextVm(c echo.Context, viewModel interface{}) *ContextVm {
 
 type ContextVm struct {
 	Session   *session.Session
+	UserName  string
 	ViewModel interface{}
 	Errors    ErrorBag
 	FlashBag  *FlashBag

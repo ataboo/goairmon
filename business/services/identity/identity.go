@@ -63,9 +63,7 @@ type IdentityService struct {
 func (i *IdentityService) LoadCurrentSession() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			if err := i.storeSessionsInContext(c); err != nil {
-				return err
-			}
+			_ = i.storeSessionsInContext(c)
 
 			return next(c)
 		}
@@ -187,7 +185,7 @@ func (i *IdentityService) storeSessionsInContext(c echo.Context) error {
 
 	cookieSession, err := cookieStore.Get(c.Request(), i.Cfg.CookieStoreKeySession)
 	if err != nil {
-		return fmt.Errorf("failed to get cookie session")
+		cookieStore.New(c.Request(), i.Cfg.CookieStoreKeySession)
 	}
 	if cookieSession.IsNew {
 		if err = cookieSession.Save(c.Request(), c.Response().Writer); err != nil {

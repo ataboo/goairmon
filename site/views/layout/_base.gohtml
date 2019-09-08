@@ -9,6 +9,7 @@
 
         {{if .Session}}
         <form class="form-inline my-0" action="auth/logout" method="POST">
+            <div class="text-light mr-3">Logged in as <strong>{{.UserName}}</strong></div>
             <button class="btn btn-outline-success my-2 my-sm-0" type="submit">Logout</button>
         </form>
         {{end}}
@@ -28,7 +29,19 @@
                 <main class="col-md-9 ml-sm-auto col-lg-10 pt-3 px-4" role="main">
 
                 {{if .FlashBag.HasSuccess }}
-                    <strong>Has success!</strong>
+                    {{range $idx, $msg := .FlashBag.Success}}
+                        <strong class="text-success">{{$msg}}</strong>
+                    {{end}}
+                {{end}}
+                {{if .FlashBag.HasInfo }}
+                    {{range $idx, $msg := .FlashBag.Info}}
+                        <strong class="text-primary">{{$msg}}</strong>
+                    {{end}}
+                {{end}}
+                {{if .FlashBag.HasSuccess }}
+                    {{range $idx, $msg := .FlashBag.Error}}
+                        <strong class="text-danger">{{$msg}}</strong>
+                    {{end}}
                 {{end}}
 
 

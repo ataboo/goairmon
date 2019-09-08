@@ -24,6 +24,7 @@ func NewSite(cfg *Config) *Site {
 	site := Site{
 		echoServer:      echo.New(),
 		identityService: identityService,
+		cfg:             cfg,
 	}
 
 	site.bindGlobalMiddleware(cfg)

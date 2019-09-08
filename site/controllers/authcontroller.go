@@ -56,7 +56,7 @@ func AuthController(server *echo.Echo, identity *identity.IdentityService) *echo
 func loginUser(c echo.Context, identity *identity.IdentityService, loginVM *models.LoginVm) error {
 	dbContext := c.Get(helper.CtxDbContext).(context.DbContext)
 	user, err := dbContext.FindUserByName(loginVM.Username)
-	if err != nil || !user.PasswordValid(loginVM.Password) {
+	if err != nil || !user.CheckPassword(loginVM.Password) {
 		return fmt.Errorf("invalid username or password")
 	}
 
@@ -65,7 +65,7 @@ func loginUser(c echo.Context, identity *identity.IdentityService, loginVM *mode
 		return fmt.Errorf("oops! something went wrong")
 	}
 
-	session.Values["user_id"] = user.ID.String()
+	session.Values["user_name"] = user.Username
 
 	return nil
 }

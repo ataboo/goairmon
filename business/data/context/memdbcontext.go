@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"goairmon/business/data/models"
 	"io/ioutil"
-	"log"
 	"os"
 
 	"github.com/google/uuid"
@@ -17,7 +16,6 @@ func NewMemDbContext(cfg *MemDbConfig) DbContext {
 	}
 
 	if err := ctx.load(); err != nil {
-		log.Print(err)
 		ctx.users = make(map[uuid.UUID]*models.User)
 	}
 
@@ -98,6 +96,7 @@ func (m *memDbContext) load() error {
 
 func (m *memDbContext) save() error {
 	raw, err := json.Marshal(m.users)
+
 	if err != nil {
 		return fmt.Errorf("failed to marshal user storage: %s", err)
 	}
