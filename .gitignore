@@ -2,3 +2,5 @@
 goairmon
 .env
 debug
+package.json
+node_modules
