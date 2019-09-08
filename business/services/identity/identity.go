@@ -2,8 +2,8 @@ package identity
 
 import (
 	"fmt"
-	"goairmon/site/helper"
 	"goairmon/business/services/session"
+	"goairmon/site/helper"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -114,25 +114,36 @@ func (i *IdentityService) RedirectUsersWithSession(redirectPath string) echo.Mid
 	}
 }
 
-func (i *IdentityService) StartNewSession(c echo.Context) error {
+func (i *IdentityService) StartNewSession(c echo.Context) (*session.Session, error) {
 	session, ok := c.Get(CtxKeySession).(*session.Session)
 	if ok && session != nil {
-		return fmt.Errorf("already logged in")
+		return nil, fmt.Errorf("already logged in")
 	}
 
-	sessionId := uuid.New()
-	session, err := i.sessionStore.NewOrExisting(sessionId.String())
+	sessionID := uuid.New()
+	session, err := i.sessionStore.NewOrExisting(sessionID.String())
 	if err != nil {
-		return fmt.Errorf("failed to make new session: %s", err)
+		return nil, fmt.Errorf("failed to make new session: %s", err)
 	}
+
+	err = i.setSessionIdInCookies(c, sessionID)
+	if err != nil {
+		i.sessionStore.Remove(sessionID.String())
+		return nil, err
+	}
+
 	c.Set(CtxKeySession, session)
 
+	return session, nil
+}
+
+func (i *IdentityService) setSessionIdInCookies(c echo.Context, sessionID uuid.UUID) error {
 	cookieSession, err := i.cookieStore.Get(c.Request(), i.Cfg.CookieStoreKeySession)
 	if err != nil {
 		return fmt.Errorf("failed to add session cookie: %s", err)
 	}
 
-	cookieSession.Values[CookiesValueSessionKey] = sessionId.String()
+	cookieSession.Values[CookiesValueSessionKey] = sessionID.String()
 	err = cookieSession.Save(c.Request(), c.Response().Writer)
 	if err != nil {
 		return fmt.Errorf("failed to save session cookie: %s", err)

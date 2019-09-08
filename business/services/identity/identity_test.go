@@ -205,13 +205,13 @@ func TestStartNewSession(t *testing.T) {
 	ctx.Set(CtxKeySession, &session.Session{})
 	identity := NewIdentityService(&IdentityConfig{CookieStoreKeySession: "app-key", CookieStoreEncryptionKey: "encryption-key"})
 
-	if err := identity.StartNewSession(ctx); err == nil {
+	if _, err := identity.StartNewSession(ctx); err == nil {
 		t.Error("expected already logged in error: ")
 	}
 
 	ctx.Set(CtxKeySession, nil)
 
-	if err := identity.StartNewSession(ctx); err != nil {
+	if _, err := identity.StartNewSession(ctx); err != nil {
 		t.Error("unexpected error", err)
 	}
 }

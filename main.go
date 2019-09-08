@@ -21,6 +21,7 @@ func main() {
 		Address:               helper.MustGetEnv("SERVER_ADDRESS"),
 		AppCookieKey:          helper.MustGetEnv("APP_COOKIE_KEY"),
 		CookieStoreEncryption: helper.MustGetEnv("COOKIE_STORE_ENCRYPTION"),
+		StoragePath:           helper.MustGetEnv("STORAGE_PATH"),
 	}
 
 	server.Start(serverCfg)

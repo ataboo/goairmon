@@ -2,6 +2,7 @@ package site
 
 import (
 	"fmt"
+	"goairmon/business/data/context"
 	"goairmon/business/services/flash"
 	"goairmon/business/services/identity"
 	"goairmon/business/services/provider"
@@ -14,36 +15,39 @@ import (
 	echomiddleware "github.com/labstack/echo/middleware"
 )
 
-func NewSite() *Site {
+func NewSite(cfg *Config) *Site {
+	identityService := identity.NewIdentityService(&identity.IdentityConfig{
+		CookieStoreKeySession:    cfg.AppCookieKey,
+		CookieStoreEncryptionKey: cfg.CookieStoreEncryption,
+	})
+
 	site := Site{
-		echoServer: echo.New(),
-		identity:   identity.NewIdentityService(nil),
+		echoServer:      echo.New(),
+		identityService: identityService,
 	}
+
+	site.bindGlobalMiddleware(cfg)
+	site.bindActions()
 
 	return &site
 }
 
 type Site struct {
-	echoServer *echo.Echo
-	identity   *identity.IdentityService
+	echoServer      *echo.Echo
+	identityService *identity.IdentityService
+	cfg             *Config
 }
 
 type Config struct {
 	AppCookieKey          string
 	CookieStoreEncryption string
 	Address               string
+	StoragePath           string
 }
 
-func (s *Site) Start(cfg *Config) {
-	s.identity.Cfg.CookieStoreKeySession = cfg.AppCookieKey
-	s.identity.Cfg.CookieStoreEncryptionKey = cfg.CookieStoreEncryption
-
-	s.echoServer = echo.New()
-	s.bindGlobalMiddleware()
-	s.bindActions()
-
+func (s *Site) Start() {
 	go func() {
-		s.echoServer.Logger.Fatal(s.echoServer.Start(cfg.Address))
+		s.echoServer.Logger.Fatal(s.echoServer.Start(s.cfg.Address))
 	}()
 }
 
@@ -52,18 +56,20 @@ func (s *Site) Cleanup() error {
 	return s.echoServer.Close()
 }
 
-func (s *Site) bindGlobalMiddleware() {
+func (s *Site) bindGlobalMiddleware(cfg *Config) {
 	provider := provider.NewServiceProvider()
 	flashService := &flash.FlashService{}
+	dbContext := context.NewMemDbContext(&context.MemDbConfig{StoragePath: cfg.StoragePath})
 
-	s.identity.RegisterWithProvider(provider)
+	s.identityService.RegisterWithProvider(provider)
 	provider.Register(viewloader.CtxKey, &viewloader.ViewLoader{})
 	provider.Register(helper.CtxFlashServiceKey, flashService)
+	provider.Register(helper.CtxDbContext, dbContext)
 
 	s.echoServer.Use(echomiddleware.Logger())
 	// s.echoServer.Use(echomiddleware.Recover())
 	s.echoServer.Use(provider.BindServices())
-	s.echoServer.Use(s.identity.LoadCurrentSession())
+	s.echoServer.Use(s.identityService.LoadCurrentSession())
 	s.echoServer.Use(flashService.PopToContext())
 	s.echoServer.Use(middleware.CSRFWithConfig(middleware.CSRFConfig{
 		TokenLookup: "form:_csrf-token",
@@ -75,6 +81,6 @@ func (s *Site) bindActions() {
 	s.echoServer.Static("/static", "site/assets")
 	s.echoServer.File("favicon.ico", "site/assets/imgs/favicon.ico")
 
-	controllers.HomeController(s.echoServer, s.identity)
-	controllers.AuthController(s.echoServer, s.identity)
+	controllers.HomeController(s.echoServer, s.identityService)
+	controllers.AuthController(s.echoServer, s.identityService)
 }

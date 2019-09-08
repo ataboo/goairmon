@@ -1,7 +1,10 @@
 package controllers
 
 import (
+	"fmt"
+	"goairmon/business/data/context"
 	"goairmon/business/services/identity"
+	"goairmon/site/helper"
 	"goairmon/site/models"
 	"log"
 	"net/http"
@@ -18,23 +21,22 @@ func AuthController(server *echo.Echo, identity *identity.IdentityService) *echo
 	}, identity.RedirectUsersWithSession("/"))
 
 	group.POST("/login", func(c echo.Context) error {
-		loginVm := models.UnmarshalLoginVm(c)
+		loginVM := models.UnmarshalLoginVm(c)
 
-		if loginVm.Username == "ataboo" && loginVm.Password == "asdfasdf" {
-			_ = identity.StartNewSession(c)
-			err := getFlashService(c).PushSuccess(c, "Successfully logged in!")
-			if err != nil {
-				log.Println(err)
-			}
+		if err := loginUser(c, identity, loginVM); err != nil {
+			view := loadView("auth/login.gohtml", c)
+			vm := models.NewContextVm(c, loginVM)
+			vm.Errors["general"] = "Failed to log in"
 
-			return c.Redirect(http.StatusSeeOther, "/")
+			return view.Execute(c.Response().Writer, vm)
 		}
 
-		view := loadView("auth/login.gohtml", c)
-		vm := models.NewContextVm(c, loginVm)
-		vm.Errors["general"] = "Invalid username or password"
+		err := getFlashService(c).PushSuccess(c, "Successfully logged in!")
+		if err != nil {
+			log.Println(err)
+		}
 
-		return view.Execute(c.Response().Writer, vm)
+		return c.Redirect(http.StatusSeeOther, "/")
 	}, identity.RedirectUsersWithSession("/"))
 
 	group.POST("/logout", func(c echo.Context) error {
@@ -49,4 +51,21 @@ func AuthController(server *echo.Echo, identity *identity.IdentityService) *echo
 	}, identity.RedirectUsersWithoutSession("/"))
 
 	return group
+}
+
+func loginUser(c echo.Context, identity *identity.IdentityService, loginVM *models.LoginVm) error {
+	dbContext := c.Get(helper.CtxDbContext).(context.DbContext)
+	user, err := dbContext.FindUserByName(loginVM.Username)
+	if err != nil || !user.PasswordValid(loginVM.Password) {
+		return fmt.Errorf("invalid username or password")
+	}
+
+	session, err := identity.StartNewSession(c)
+	if err != nil {
+		return fmt.Errorf("oops! something went wrong")
+	}
+
+	session.Values["user_id"] = user.ID.String()
+
+	return nil
 }

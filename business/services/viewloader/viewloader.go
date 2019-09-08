@@ -2,8 +2,8 @@ package viewloader
 
 import (
 	"fmt"
+	"goairmon/site/helper"
 	"html/template"
-	"os"
 	"path/filepath"
 
 	"github.com/labstack/echo"
@@ -14,23 +14,8 @@ const CtxKey = "view_loader"
 type ViewLoader struct {
 }
 
-func siteRoot() string {
-	dir, _ := os.Getwd()
-	for i := 0; i < 10; i++ {
-
-		_, err := os.Stat(dir + "/site")
-		if err == nil {
-			return dir + "/site"
-		}
-
-		dir = dir + "../"
-	}
-
-	panic("failed to find site root")
-}
-
 func fullViewPath(viewPath string) string {
-	return siteRoot() + "/views/" + viewPath
+	return helper.SiteRoot() + "/views/" + viewPath
 }
 
 func (v *ViewLoader) layoutFilenames() []string {

@@ -7,4 +7,5 @@ const (
 	CtxKeySession      = "current_session"
 	CtxCookieSession   = "cookie_session"
 	CtxFlashMessages   = "flash_messages"
+	CtxDbContext       = "db_context"
 )
