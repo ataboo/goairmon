@@ -12,32 +12,12 @@ import (
 	"github.com/labstack/echo"
 )
 
-func TestPanicWhenNoSessionStore(t *testing.T) {
-	defer _assertPanic(t)
-
-	service := NewIdentityService(nil)
-
-	ctx := &testhelpers.FakeContext{Values: make(map[string]interface{})}
-	ctx.Set(CtxKeyCookieStore, &sessions.CookieStore{})
-	_ = service.storeSessionsInContext(ctx)
-}
-
-func TestPanicWhenNoCookieStore(t *testing.T) {
-	defer _assertPanic(t)
-
-	service := NewIdentityService(nil)
-
-	ctx := &testhelpers.FakeContext{Values: make(map[string]interface{})}
-	ctx.Set(CtxKeySessionStore, &session.SessionStore{})
-	_ = service.storeSessionsInContext(ctx)
-}
-
 func TestCreatesNewCookieSession(t *testing.T) {
 	service := NewIdentityService(nil)
 
 	ctx := &testhelpers.FakeContext{Values: make(map[string]interface{}), FakeWriter: httptest.NewRecorder()}
-	ctx.Set(CtxKeySessionStore, &session.SessionStore{})
-	ctx.Set(CtxKeyCookieStore, sessions.NewCookieStore([]byte("cookie-encryption")))
+	service.sessionStore = &session.SessionStore{}
+	service.cookieStore = sessions.NewCookieStore([]byte("cookie-encryption"))
 
 	err := service.storeSessionsInContext(ctx)
 	if err != nil {
@@ -54,35 +34,32 @@ func TestErrorWhenSessionIdNotFoundInSessionStore(t *testing.T) {
 
 	ctx := &testhelpers.FakeContext{Values: make(map[string]interface{})}
 	cfg := session.Config{ExpirationSecs: 60}
-	sessionStore := session.NewSessionStore(cfg)
-	cookieStore := &testhelpers.FakeCookieStore{Sessions: make(map[string]*sessions.Session)}
-	cookieSession, _ := cookieStore.New(nil, service.Cfg.CookieStoreKeySession)
-
-	ctx.Set(CtxKeySessionStore, sessionStore)
-	ctx.Set(CtxKeyCookieStore, cookieStore)
+	service.sessionStore = session.NewSessionStore(cfg)
+	service.cookieStore = &testhelpers.FakeCookieStore{Sessions: make(map[string]*sessions.Session)}
+	cookieSession, _ := service.cookieStore.New(nil, service.Cfg.CookieStoreKeySession)
 
 	if cookieSess, ok := ctx.Get(CtxCookieSession).(*sessions.Session); ok && cookieSess != nil {
 		t.Error("expected no cookie session")
 	}
 
-	if sess, ok := ctx.Get(CtxKeySession).(*session.Session); ok && sess != nil {
+	if sess, ok := ctx.Get(CtxServerSession).(*session.Session); ok && sess != nil {
 		t.Error("expected no session in context")
 	}
 
 	cookieSession.Values[CookiesValueSessionKey] = "first_session_id"
-	_ = cookieStore.Save(nil, nil, cookieSession)
+	_ = service.cookieStore.Save(nil, nil, cookieSession)
 
 	_ = service.storeSessionsInContext(ctx)
 
-	if ctx.Get(CtxKeySession).(*session.Session) != nil {
+	if ctx.Get(CtxServerSession).(*session.Session) != nil {
 		t.Error("expected no session in context")
 	}
 
-	newSess, _ := sessionStore.NewOrExisting("first_session_id")
+	newSess, _ := service.sessionStore.NewOrExisting("first_session_id")
 
 	_ = service.storeSessionsInContext(ctx)
 
-	if ctx.Get(CtxKeySession).(*session.Session) != newSess {
+	if ctx.Get(CtxServerSession).(*session.Session) != newSess {
 		t.Error("expected session to be stored in context")
 	}
 }
@@ -92,18 +69,16 @@ func TestIdentityMiddleware(t *testing.T) {
 
 	ctx := &testhelpers.FakeContext{Values: make(map[string]interface{})}
 	cfg := session.Config{ExpirationSecs: 60}
-	sessionStore := session.NewSessionStore(cfg)
-	cookieStore := &testhelpers.FakeCookieStore{Sessions: make(map[string]*sessions.Session)}
-	cookieSession, _ := cookieStore.New(nil, service.Cfg.CookieStoreKeySession)
+	service.sessionStore = session.NewSessionStore(cfg)
+	service.cookieStore = &testhelpers.FakeCookieStore{Sessions: make(map[string]*sessions.Session)}
+	cookieSession, _ := service.cookieStore.New(nil, service.Cfg.CookieStoreKeySession)
 	cookieSession.Values[CookiesValueSessionKey] = "first_session_id"
-	_ = cookieStore.Save(nil, nil, cookieSession)
-	newSess, _ := sessionStore.NewOrExisting("first_session_id")
-	ctx.Set(CtxKeySessionStore, sessionStore)
-	ctx.Set(CtxKeyCookieStore, cookieStore)
+	_ = service.cookieStore.Save(nil, nil, cookieSession)
+	newSess, _ := service.sessionStore.NewOrExisting("first_session_id")
 
 	_ = service.LoadCurrentSession()(testhelpers.EmptyHandler)(ctx)
 
-	sess := ctx.Get(CtxKeySession)
+	sess := ctx.Get(CtxServerSession)
 	if sess != newSess {
 		t.Error("expected matching sessions")
 	}
@@ -128,7 +103,17 @@ func TestRequireSession(t *testing.T) {
 		t.Error("should be returning unauthorized")
 	}
 
-	ctx.Set(CtxKeySession, &session.Session{})
+	runFlag := false
+	service.RequireSession(func(c echo.Context) error {
+		runFlag = true
+		return nil
+	})(nextHandler)(ctx)
+
+	if runFlag == false {
+		t.Error("flag should be set")
+	}
+
+	ctx.Set(CtxServerSession, &session.Session{})
 
 	_ = service.RequireSession(nil)(nextHandler)(ctx)
 
@@ -155,7 +140,7 @@ func TestRedirectWithoutSession(t *testing.T) {
 		t.Error("unexpected redirect", ctx.RedirectPath)
 	}
 
-	ctx.Set(CtxKeySession, &session.Session{})
+	ctx.Set(CtxServerSession, &session.Session{})
 
 	_ = identity.RedirectUsersWithoutSession("/destinationpath2")(func(c echo.Context) error {
 		return c.Redirect(200, "/notredirected")
@@ -172,7 +157,7 @@ func TestRedirectWithSession(t *testing.T) {
 		Values:     make(map[string]interface{}),
 	}
 
-	ctx.Set(CtxKeySession, &session.Session{})
+	ctx.Set(CtxServerSession, &session.Session{})
 
 	identity := NewIdentityService(&IdentityConfig{CookieStoreKeySession: "app-key", CookieStoreEncryptionKey: "encryption-key"})
 	_ = identity.RedirectUsersWithSession("/destinationpath")(testhelpers.EmptyHandler)(ctx)
@@ -185,7 +170,7 @@ func TestRedirectWithSession(t *testing.T) {
 		t.Error("unexpected redirect", ctx.RedirectPath)
 	}
 
-	ctx.Set(CtxKeySession, nil)
+	ctx.Set(CtxServerSession, nil)
 
 	_ = identity.RedirectUsersWithSession("/destinationpath2")(func(c echo.Context) error {
 		return c.Redirect(200, "/notredirected")
@@ -202,14 +187,14 @@ func TestStartNewSession(t *testing.T) {
 		Values:     make(map[string]interface{}),
 	}
 
-	ctx.Set(CtxKeySession, &session.Session{})
+	ctx.Set(CtxServerSession, &session.Session{})
 	identity := NewIdentityService(&IdentityConfig{CookieStoreKeySession: "app-key", CookieStoreEncryptionKey: "encryption-key"})
 
 	if _, err := identity.StartNewSession(ctx); err == nil {
 		t.Error("expected already logged in error: ")
 	}
 
-	ctx.Set(CtxKeySession, nil)
+	ctx.Set(CtxServerSession, nil)
 
 	if _, err := identity.StartNewSession(ctx); err != nil {
 		t.Error("unexpected error", err)
@@ -228,24 +213,10 @@ func TestEndSession(t *testing.T) {
 		t.Error("expected already logged out error: ")
 	}
 
-	ctx.Set(CtxKeySession, &session.Session{})
+	ctx.Set(CtxServerSession, &session.Session{})
 
 	if err := identity.EndSession(ctx); err != nil {
 		t.Error("unexpected error", err)
-	}
-}
-
-func TestRegisterServiceProvider(t *testing.T) {
-	provider := &_fakeServiceProvider{make(map[string]interface{})}
-	identity := NewIdentityService(&IdentityConfig{CookieStoreKeySession: "app-key", CookieStoreEncryptionKey: "encryption-key"})
-	identity.RegisterWithProvider(provider)
-
-	if provider.services[CtxKeyCookieStore] != identity.cookieStore {
-		t.Error("mismatch for cookie store")
-	}
-
-	if provider.services[CtxKeySessionStore] != identity.sessionStore {
-		t.Error("mismatch for session store")
 	}
 }
 

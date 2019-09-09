@@ -2,22 +2,32 @@ package context
 
 import (
 	"goairmon/business/data/models"
+	"goairmon/site/helper"
 	"io/ioutil"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/joho/godotenv"
 )
 
 func _setupMemDbContext(t *testing.T) *memDbContext {
+	if err := godotenv.Load(helper.AppRoot() + "/.env.testing"); err != nil {
+		t.Fatal("failed to load .env.testing")
+	}
+
 	ctx := NewMemDbContext(&MemDbConfig{
-		StoragePath: "/tmp/goairmon_testing",
+		StoragePath:      helper.MustGetEnv("STORAGE_PATH"),
+		SensorPointCount: 10,
+		EncodeReadible:   true,
 	})
 
 	memCtx := ctx.(*memDbContext)
 
-	os.Remove(memCtx.userFile())
-	memCtx.load()
+	os.RemoveAll(memCtx.cfg.StoragePath)
+	memCtx.loadUsers()
+	memCtx.loadPoints()
 
 	return memCtx
 }
@@ -95,20 +105,30 @@ func TestSaveAndLoad(t *testing.T) {
 	user := &models.User{
 		Username: "test-username",
 	}
+	point := &models.SensorPoint{
+		Time:     time.Date(2010, 1, 1, 0, 0, 0, 0, time.UTC),
+		Co2Value: 1.0,
+	}
 
 	ctx.CreateOrUpdateUser(user)
+	ctx.PushSensorPoint(point)
 
 	if err := ctx.Close(); err != nil {
 		t.Error(err)
 	}
 
 	if _, err := os.Stat(ctx.userFile()); err != nil {
-		t.Error("failed to find os file")
+		t.Error("failed to find user os file")
+	}
+
+	if _, err := os.Stat(ctx.pointFile()); err != nil {
+		t.Error("failed to find point os file")
 	}
 
 	ctx.users = nil
+	ctx.sensorPoints.Clear()
 
-	if err := ctx.load(); err != nil {
+	if err := ctx.loadUsers(); err != nil {
 		t.Error(err)
 	}
 
@@ -119,6 +139,23 @@ func TestSaveAndLoad(t *testing.T) {
 
 	if result.Username != user.Username || result.ID != user.ID {
 		t.Errorf("User mismatch: %+v, %+v", user, result)
+	}
+
+	if err := ctx.loadPoints(); err != nil {
+		t.Error(err)
+	}
+
+	points, err := ctx.GetSensorPoints(1)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if len(points) != 1 {
+		t.Error("unexpected point count", 1, len(points))
+	}
+
+	if points[0].Time != point.Time || points[0].Co2Value != point.Co2Value {
+		t.Error("point mismatch", points[0], point)
 	}
 }
 
@@ -191,11 +228,20 @@ func TestDeleteUser(t *testing.T) {
 
 func TestLoadInvalidFile(t *testing.T) {
 	ctx := _setupMemDbContext(t)
+
+	os.MkdirAll(ctx.cfg.StoragePath, 0700)
 	if err := ioutil.WriteFile(ctx.userFile(), []byte("garbagedata"), 0644); err != nil {
 		t.Error(err)
 	}
+	if err := ioutil.WriteFile(ctx.pointFile(), []byte("garbagedata"), 0644); err != nil {
+		t.Error(err)
+	}
 
-	if err := ctx.load(); err == nil {
+	if err := ctx.loadUsers(); err == nil {
+		t.Error("expected error")
+	}
+
+	if err := ctx.loadPoints(); err == nil {
 		t.Error("expected error")
 	}
 
@@ -210,9 +256,52 @@ func TestSaveInvalidData(t *testing.T) {
 
 	os.Remove(ctx.userFile())
 	os.MkdirAll(ctx.userFile(), 0700)
-	if err := ctx.save(); err == nil {
+	os.MkdirAll(ctx.pointFile(), 0700)
+	if err := ctx.saveUsers(); err == nil {
 		t.Error("expected error on save")
 	}
 
+	if err := ctx.savePoints(); err == nil {
+		t.Error("expected error on save")
+	}
+
+	if err := ctx.Close(); err == nil {
+		t.Error("expected error")
+	}
+
 	os.Remove(ctx.userFile())
+	os.Remove(ctx.pointFile())
+}
+
+func TestPushSensorPoints(t *testing.T) {
+	ctx := _setupMemDbContext(t)
+
+	point1 := &models.SensorPoint{
+		Time:     time.Date(2010, 1, 1, 0, 0, 0, 0, time.UTC),
+		Co2Value: 1.0,
+	}
+	point2 := &models.SensorPoint{
+		Time: time.Date(2011, 1, 1, 0, 0, 0, 0, time.UTC),
+	}
+
+	if err := ctx.PushSensorPoint(point1); err != nil {
+		t.Error(err)
+	}
+
+	if err := ctx.PushSensorPoint(point2); err != nil {
+		t.Error(err)
+	}
+
+	peaked, err := ctx.GetSensorPoints(2)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if peaked[0].Co2Value != point2.Co2Value || peaked[0].Time != point2.Time {
+		t.Error("value mismatch", peaked[0], point2)
+	}
+
+	if peaked[1].Co2Value != point1.Co2Value || peaked[1].Time != point1.Time {
+		t.Error("value mismatch", peaked[1], point1)
+	}
 }

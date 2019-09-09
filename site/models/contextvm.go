@@ -8,13 +8,13 @@ import (
 )
 
 const (
-	CtxKeySession    = helper.CtxKeySession
+	CtxServerSession = helper.CtxServerSession
 	CtxFlashMessages = helper.CtxFlashMessages
 )
 
 func NewContextVm(c echo.Context, viewModel interface{}) *ContextVm {
 	// If this gets carried away, make me a factory service
-	sess, _ := c.Get(CtxKeySession).(*session.Session)
+	sess, _ := c.Get(CtxServerSession).(*session.Session)
 	flashBag, _ := c.Get(CtxFlashMessages).(*FlashBag)
 	csrfToken := c.Get("csrf").(string)
 	userName := ""

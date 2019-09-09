@@ -12,4 +12,6 @@ type DbContext interface {
 	FindUser(id uuid.UUID) (*models.User, error)
 	FindUserByName(username string) (*models.User, error)
 	DeleteUser(id uuid.UUID) error
+	PushSensorPoint(point *models.SensorPoint) error
+	GetSensorPoints(count int) ([]*models.SensorPoint, error)
 }

@@ -44,6 +44,8 @@ type Config struct {
 	CookieStoreEncryption string
 	Address               string
 	StoragePath           string
+	SensorPointCount      int
+	EncodeReadible        bool
 }
 
 func (s *Site) Start() {
@@ -60,9 +62,12 @@ func (s *Site) Cleanup() error {
 func (s *Site) bindGlobalMiddleware(cfg *Config) {
 	provider := provider.NewServiceProvider()
 	flashService := &flash.FlashService{}
-	dbContext := context.NewMemDbContext(&context.MemDbConfig{StoragePath: cfg.StoragePath})
+	dbContext := context.NewMemDbContext(&context.MemDbConfig{
+		StoragePath:      cfg.StoragePath,
+		SensorPointCount: cfg.SensorPointCount,
+		EncodeReadible:   cfg.EncodeReadible,
+	})
 
-	s.identityService.RegisterWithProvider(provider)
 	provider.Register(viewloader.CtxKey, &viewloader.ViewLoader{})
 	provider.Register(helper.CtxFlashServiceKey, flashService)
 	provider.Register(helper.CtxDbContext, dbContext)

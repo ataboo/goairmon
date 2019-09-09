@@ -31,7 +31,7 @@ func AppRoot() string {
 			return dir
 		}
 
-		dir = dir + "../"
+		dir = dir + "/.."
 	}
 
 	panic("failed to find site root")

@@ -2,40 +2,75 @@ package context
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"goairmon/business/data/models"
 	"io/ioutil"
 	"os"
+	"strings"
+	"sync"
 
 	"github.com/google/uuid"
 )
 
 func NewMemDbContext(cfg *MemDbConfig) DbContext {
 	ctx := &memDbContext{
-		cfg: cfg,
+		cfg:          cfg,
+		sensorPoints: NewSensorPointStack(cfg.SensorPointCount),
 	}
 
-	if err := ctx.load(); err != nil {
+	ctx.lock.Lock()
+	defer ctx.lock.Unlock()
+
+	if err := ctx.loadUsers(); err != nil {
 		ctx.users = make(map[uuid.UUID]*models.User)
+	}
+
+	if err := ctx.loadPoints(); err != nil {
+		ctx.sensorPoints.Clear()
 	}
 
 	return ctx
 }
 
 type MemDbConfig struct {
-	StoragePath string
+	StoragePath      string
+	SensorPointCount int
+	EncodeReadible   bool
 }
 
 type memDbContext struct {
-	cfg   *MemDbConfig
-	users map[uuid.UUID]*models.User
+	cfg          *MemDbConfig
+	users        map[uuid.UUID]*models.User
+	sensorPoints PointStack
+	lock         sync.Mutex
 }
 
 func (m *memDbContext) Close() error {
-	return m.save()
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	errs := make([]string, 0)
+
+	if err := m.savePoints(); err != nil {
+		errs = append(errs, err.Error())
+	}
+
+	if err := m.saveUsers(); err != nil {
+		errs = append(errs, err.Error())
+	}
+
+	if len(errs) > 0 {
+		return errors.New(strings.Join(errs, ", "))
+	}
+
+	return nil
 }
 
 func (m *memDbContext) CreateOrUpdateUser(user *models.User) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	if user.ID != uuid.Nil {
 		existing, ok := m.users[user.ID]
 		if ok {
@@ -51,6 +86,9 @@ func (m *memDbContext) CreateOrUpdateUser(user *models.User) error {
 }
 
 func (m *memDbContext) FindUser(id uuid.UUID) (*models.User, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	existing, ok := m.users[id]
 	if ok {
 		user := existing.CopyTo(&models.User{})
@@ -61,6 +99,9 @@ func (m *memDbContext) FindUser(id uuid.UUID) (*models.User, error) {
 }
 
 func (m *memDbContext) FindUserByName(userName string) (*models.User, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	for _, user := range m.users {
 		if user.Username == userName {
 			return user, nil
@@ -71,6 +112,9 @@ func (m *memDbContext) FindUserByName(userName string) (*models.User, error) {
 }
 
 func (m *memDbContext) DeleteUser(id uuid.UUID) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	_, ok := m.users[id]
 	if ok {
 		delete(m.users, id)
@@ -80,7 +124,7 @@ func (m *memDbContext) DeleteUser(id uuid.UUID) error {
 	return fmt.Errorf("id not found")
 }
 
-func (m *memDbContext) load() error {
+func (m *memDbContext) loadUsers() error {
 	raw, err := ioutil.ReadFile(m.userFile())
 	if err != nil {
 		return fmt.Errorf("failed to read user storage: %s", err)
@@ -94,23 +138,67 @@ func (m *memDbContext) load() error {
 	return nil
 }
 
-func (m *memDbContext) save() error {
-	raw, err := json.Marshal(m.users)
+func (m *memDbContext) loadPoints() error {
+	raw, err := ioutil.ReadFile(m.pointFile())
+	if err != nil {
+		return fmt.Errorf("failed to read point storage: %s", err)
+	}
 
+	if err := m.sensorPoints.Decode(raw); err != nil {
+		return fmt.Errorf("failed to decode point storage: %s", err)
+	}
+
+	return nil
+}
+
+func (m *memDbContext) saveUsers() error {
+	raw, err := json.Marshal(m.users)
 	if err != nil {
 		return fmt.Errorf("failed to marshal user storage: %s", err)
 	}
 
-	err = ioutil.WriteFile(m.userFile(), raw, 0644)
-	if err != nil {
+	os.MkdirAll(m.cfg.StoragePath, 0700)
+	if err := ioutil.WriteFile(m.userFile(), raw, 0644); err != nil {
 		return fmt.Errorf("failed to save user storage: %s", err)
 	}
 
 	return nil
 }
 
-func (m *memDbContext) userFile() string {
-	os.MkdirAll(m.cfg.StoragePath, 0700)
+func (m *memDbContext) savePoints() error {
+	raw, err := m.sensorPoints.Encode()
+	if err != nil {
+		return fmt.Errorf("failed to marshal sensor points: %s", err)
+	}
 
+	os.MkdirAll(m.cfg.StoragePath, 0700)
+	if err := ioutil.WriteFile(m.pointFile(), raw, 0644); err != nil {
+		return fmt.Errorf("failed to write sensor points: %s", err)
+	}
+
+	return nil
+}
+
+func (m *memDbContext) userFile() string {
 	return m.cfg.StoragePath + "/goairmon_users.json"
+}
+
+func (m *memDbContext) pointFile() string {
+	return m.cfg.StoragePath + "/goairmon_points.json"
+}
+
+func (m *memDbContext) PushSensorPoint(point *models.SensorPoint) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	m.sensorPoints.Push(point)
+
+	return nil
+}
+
+func (m *memDbContext) GetSensorPoints(count int) ([]*models.SensorPoint, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	return m.sensorPoints.PeakNLatest(count)
 }
