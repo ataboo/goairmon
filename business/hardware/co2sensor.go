@@ -6,7 +6,7 @@ type Co2Sensor interface {
 	IsOn() bool
 	On() error
 	Off() error
-	Read() (int, error)
+	Read() (float64, error)
 	Close()
 }
 
@@ -53,7 +53,7 @@ func (s *piCo2Sensor) IsOn() bool {
 	return s.active
 }
 
-func (s *piCo2Sensor) Read() (int, error) {
+func (s *piCo2Sensor) Read() (float64, error) {
 	//
 
 	return 0, nil

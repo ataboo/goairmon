@@ -12,13 +12,13 @@ func init() {
 }
 
 func NewFakeCo2Sensor(cfg *Co2SensorCfg) Co2Sensor {
-	min := 0
-	max := 100
+	min := 0.0
+	max := 100.0
 
 	sensor := &fakeCo2Sensor{
 		cfg:         cfg,
 		active:      false,
-		lastReading: float64((max-min)/2 + min),
+		lastReading: (max-min)/2.0 + min,
 		min:         min,
 		max:         max,
 		variance:    0.1,
@@ -31,8 +31,8 @@ type fakeCo2Sensor struct {
 	cfg         *Co2SensorCfg
 	active      bool
 	lastReading float64
-	min         int
-	max         int
+	min         float64
+	max         float64
 	variance    float64
 }
 
@@ -52,16 +52,16 @@ func (s *fakeCo2Sensor) IsOn() bool {
 	return s.active
 }
 
-func (s *fakeCo2Sensor) Read() (int, error) {
+func (s *fakeCo2Sensor) Read() (float64, error) {
 	if !s.active {
 		return -1, fmt.Errorf("sensor not active")
 	}
 
-	newVal := float64(s.lastReading) + (rand.Float64()*2.0-1.0)*float64(s.max-s.min)*s.variance
-	newVal = math.Min(math.Max(newVal, float64(s.min)), float64(s.max))
+	newVal := s.lastReading + (rand.Float64()*2.0-1.0)*(s.max-s.min)*s.variance
+	newVal = math.Min(math.Max(newVal, s.min), s.max)
 	s.lastReading = newVal
 
-	return int(newVal), nil
+	return newVal, nil
 }
 
 func (s *fakeCo2Sensor) Close() {
