@@ -22,8 +22,10 @@ func NewMemDbContext(cfg *MemDbConfig) DbContext {
 	ctx.lock.Lock()
 	defer ctx.lock.Unlock()
 
-	if err := ctx.loadUsers(); err != nil {
-		ctx.users = make(map[uuid.UUID]*models.User)
+	if err := ctx.loadStoredConfig(); err != nil {
+		ctx.storedConfig = &StoredConfig{
+			Users: make(map[uuid.UUID]*models.User),
+		}
 	}
 
 	if err := ctx.loadPoints(); err != nil {
@@ -31,6 +33,12 @@ func NewMemDbContext(cfg *MemDbConfig) DbContext {
 	}
 
 	return ctx
+}
+
+type StoredConfig struct {
+	ECO2Baseline uint16 `json:"eco2"`
+	TVOCBaseline uint16 `json:"tvoc"`
+	Users        map[uuid.UUID]*models.User
 }
 
 type MemDbConfig struct {
@@ -41,8 +49,8 @@ type MemDbConfig struct {
 
 type memDbContext struct {
 	cfg          *MemDbConfig
-	users        map[uuid.UUID]*models.User
 	sensorPoints PointStack
+	storedConfig *StoredConfig
 	lock         sync.Mutex
 }
 
@@ -56,7 +64,7 @@ func (m *memDbContext) Close() error {
 		errs = append(errs, err.Error())
 	}
 
-	if err := m.saveUsers(); err != nil {
+	if err := m.saveStoredConfig(); err != nil {
 		errs = append(errs, err.Error())
 	}
 
@@ -72,7 +80,7 @@ func (m *memDbContext) CreateOrUpdateUser(user *models.User) error {
 	defer m.lock.Unlock()
 
 	if user.ID != uuid.Nil {
-		existing, ok := m.users[user.ID]
+		existing, ok := m.storedConfig.Users[user.ID]
 		if ok {
 			user.CopyTo(existing)
 			return nil
@@ -80,7 +88,7 @@ func (m *memDbContext) CreateOrUpdateUser(user *models.User) error {
 	}
 
 	user.ID = uuid.New()
-	m.users[user.ID] = user.CopyTo(&models.User{})
+	m.storedConfig.Users[user.ID] = user.CopyTo(&models.User{})
 
 	return nil
 }
@@ -89,7 +97,7 @@ func (m *memDbContext) FindUser(id uuid.UUID) (*models.User, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	existing, ok := m.users[id]
+	existing, ok := m.storedConfig.Users[id]
 	if ok {
 		user := existing.CopyTo(&models.User{})
 		return user, nil
@@ -102,7 +110,7 @@ func (m *memDbContext) FindUserByName(userName string) (*models.User, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	for _, user := range m.users {
+	for _, user := range m.storedConfig.Users {
 		if user.Username == userName {
 			return user, nil
 		}
@@ -115,27 +123,13 @@ func (m *memDbContext) DeleteUser(id uuid.UUID) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	_, ok := m.users[id]
+	_, ok := m.storedConfig.Users[id]
 	if ok {
-		delete(m.users, id)
+		delete(m.storedConfig.Users, id)
 		return nil
 	}
 
 	return fmt.Errorf("id not found")
-}
-
-func (m *memDbContext) loadUsers() error {
-	raw, err := ioutil.ReadFile(m.userFile())
-	if err != nil {
-		return fmt.Errorf("failed to read user storage: %s", err)
-	}
-	err = json.Unmarshal(raw, &m.users)
-
-	if err != nil {
-		return fmt.Errorf("failed to decode user storage: %s", err)
-	}
-
-	return nil
 }
 
 func (m *memDbContext) loadPoints() error {
@@ -151,14 +145,27 @@ func (m *memDbContext) loadPoints() error {
 	return nil
 }
 
-func (m *memDbContext) saveUsers() error {
-	raw, err := json.Marshal(m.users)
+func (m *memDbContext) loadStoredConfig() error {
+	raw, err := ioutil.ReadFile(m.configFile())
 	if err != nil {
-		return fmt.Errorf("failed to marshal user storage: %s", err)
+		return fmt.Errorf("failed to read stored config: %s", err)
+	}
+
+	if err := json.Unmarshal(raw, m.storedConfig); err != nil {
+		return fmt.Errorf("failed to decode stored config: %s", err)
+	}
+
+	return nil
+}
+
+func (m *memDbContext) saveStoredConfig() error {
+	raw, err := json.Marshal(m.storedConfig)
+	if err != nil {
+		return fmt.Errorf("failed to marshal stored config: %s", err)
 	}
 
 	os.MkdirAll(m.cfg.StoragePath, 0700)
-	if err := ioutil.WriteFile(m.userFile(), raw, 0644); err != nil {
+	if err := ioutil.WriteFile(m.configFile(), raw, 0644); err != nil {
 		return fmt.Errorf("failed to save user storage: %s", err)
 	}
 
@@ -179,8 +186,8 @@ func (m *memDbContext) savePoints() error {
 	return nil
 }
 
-func (m *memDbContext) userFile() string {
-	return m.cfg.StoragePath + "/goairmon_users.json"
+func (m *memDbContext) configFile() string {
+	return m.cfg.StoragePath + "/goairmon_config.json"
 }
 
 func (m *memDbContext) pointFile() string {
@@ -201,4 +208,20 @@ func (m *memDbContext) GetSensorPoints(count int) ([]*models.SensorPoint, error)
 	defer m.lock.Unlock()
 
 	return m.sensorPoints.PeakNLatest(count)
+}
+
+func (m *memDbContext) GetSensorBaseline() (eCO2 uint16, TVOC uint16, err error) {
+	eCO2 = m.storedConfig.ECO2Baseline
+	TVOC = m.storedConfig.TVOCBaseline
+	if eCO2 == 0 || TVOC == 0 {
+		err = fmt.Errorf("baseline not set")
+	}
+	return eCO2, TVOC, err
+}
+
+func (m *memDbContext) SetSensorBaseline(eCO2 uint16, TVOC uint16) error {
+	m.storedConfig.ECO2Baseline = eCO2
+	m.storedConfig.TVOCBaseline = TVOC
+
+	return nil
 }

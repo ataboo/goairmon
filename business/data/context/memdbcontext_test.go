@@ -26,7 +26,7 @@ func _setupMemDbContext(t *testing.T) *memDbContext {
 	memCtx := ctx.(*memDbContext)
 
 	os.RemoveAll(memCtx.cfg.StoragePath)
-	memCtx.loadUsers()
+	memCtx.loadStoredConfig()
 	memCtx.loadPoints()
 
 	return memCtx
@@ -78,12 +78,12 @@ func TestUpdateExistingUser(t *testing.T) {
 		Username: "test-username2",
 	}
 
-	ctx.users[user1.ID] = user1.CopyTo(&models.User{})
-	ctx.users[user2.ID] = user2.CopyTo(&models.User{})
+	ctx.storedConfig.Users[user1.ID] = user1.CopyTo(&models.User{})
+	ctx.storedConfig.Users[user2.ID] = user2.CopyTo(&models.User{})
 
 	user1.Username = "changed-username"
 
-	if ctx.users[user1.ID].Username != "test-username" {
+	if ctx.storedConfig.Users[user1.ID].Username != "test-username" {
 		t.Error("username should not have changed")
 	}
 
@@ -91,11 +91,11 @@ func TestUpdateExistingUser(t *testing.T) {
 		t.Error(err)
 	}
 
-	if len(ctx.users) != 2 {
-		t.Error("expected two users", len(ctx.users))
+	if len(ctx.storedConfig.Users) != 2 {
+		t.Error("expected two users", len(ctx.storedConfig.Users))
 	}
 
-	if ctx.users[user1.ID].Username != "changed-username" {
+	if ctx.storedConfig.Users[user1.ID].Username != "changed-username" {
 		t.Error("username should have changed")
 	}
 }
@@ -117,7 +117,7 @@ func TestSaveAndLoad(t *testing.T) {
 		t.Error(err)
 	}
 
-	if _, err := os.Stat(ctx.userFile()); err != nil {
+	if _, err := os.Stat(ctx.configFile()); err != nil {
 		t.Error("failed to find user os file")
 	}
 
@@ -125,10 +125,10 @@ func TestSaveAndLoad(t *testing.T) {
 		t.Error("failed to find point os file")
 	}
 
-	ctx.users = nil
+	ctx.storedConfig.Users = nil
 	ctx.sensorPoints.Clear()
 
-	if err := ctx.loadUsers(); err != nil {
+	if err := ctx.loadStoredConfig(); err != nil {
 		t.Error(err)
 	}
 
@@ -206,18 +206,18 @@ func TestDeleteUser(t *testing.T) {
 		Username: "second-user",
 	}
 
-	ctx.users[user1.ID] = user1
-	ctx.users[user2.ID] = user2
+	ctx.storedConfig.Users[user1.ID] = user1
+	ctx.storedConfig.Users[user2.ID] = user2
 
 	if err := ctx.DeleteUser(user2.ID); err != nil {
 		t.Error(err)
 	}
 
-	if len(ctx.users) != 1 {
-		t.Error("unexpected count", len(ctx.users))
+	if len(ctx.storedConfig.Users) != 1 {
+		t.Error("unexpected count", len(ctx.storedConfig.Users))
 	}
 
-	if _, ok := ctx.users[user1.ID]; !ok {
+	if _, ok := ctx.storedConfig.Users[user1.ID]; !ok {
 		t.Error("user 1 should exist")
 	}
 
@@ -230,14 +230,14 @@ func TestLoadInvalidFile(t *testing.T) {
 	ctx := _setupMemDbContext(t)
 
 	os.MkdirAll(ctx.cfg.StoragePath, 0700)
-	if err := ioutil.WriteFile(ctx.userFile(), []byte("garbagedata"), 0644); err != nil {
+	if err := ioutil.WriteFile(ctx.configFile(), []byte("garbagedata"), 0644); err != nil {
 		t.Error(err)
 	}
 	if err := ioutil.WriteFile(ctx.pointFile(), []byte("garbagedata"), 0644); err != nil {
 		t.Error(err)
 	}
 
-	if err := ctx.loadUsers(); err == nil {
+	if err := ctx.loadStoredConfig(); err == nil {
 		t.Error("expected error")
 	}
 
@@ -245,19 +245,19 @@ func TestLoadInvalidFile(t *testing.T) {
 		t.Error("expected error")
 	}
 
-	if ctx.users == nil || len(ctx.users) != 0 {
+	if ctx.storedConfig.Users == nil || len(ctx.storedConfig.Users) != 0 {
 		t.Error("expected empty users map set")
 	}
 }
 
 func TestSaveInvalidData(t *testing.T) {
 	ctx := _setupMemDbContext(t)
-	ctx.users = nil
+	ctx.storedConfig.Users = nil
 
-	os.Remove(ctx.userFile())
-	os.MkdirAll(ctx.userFile(), 0700)
+	os.Remove(ctx.configFile())
+	os.MkdirAll(ctx.configFile(), 0700)
 	os.MkdirAll(ctx.pointFile(), 0700)
-	if err := ctx.saveUsers(); err == nil {
+	if err := ctx.saveStoredConfig(); err == nil {
 		t.Error("expected error on save")
 	}
 
@@ -269,7 +269,7 @@ func TestSaveInvalidData(t *testing.T) {
 		t.Error("expected error")
 	}
 
-	os.Remove(ctx.userFile())
+	os.Remove(ctx.configFile())
 	os.Remove(ctx.pointFile())
 }
 
@@ -303,5 +303,49 @@ func TestPushSensorPoints(t *testing.T) {
 
 	if peaked[1].Co2Value != point1.Co2Value || peaked[1].Time != point1.Time {
 		t.Error("value mismatch", peaked[1], point1)
+	}
+}
+
+func TestSaveSensorBaseline(t *testing.T) {
+	ctx := _setupMemDbContext(t)
+
+	if _, _, err := ctx.GetSensorBaseline(); err == nil {
+		t.Error("expected error")
+	}
+
+	if err := ctx.SetSensorBaseline(1, 2); err != nil {
+		t.Error(err)
+	}
+
+	eco2, tvoc, err := ctx.GetSensorBaseline()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if eco2 != 1 {
+		t.Error("unexpected eco2 value", 1, eco2)
+	}
+
+	if tvoc != 2 {
+		t.Error("unexpected tvoc value", 2, tvoc)
+	}
+
+	if err := ctx.saveStoredConfig(); err != nil {
+		t.Error(err)
+	}
+
+	ctx.storedConfig.ECO2Baseline = 0
+	ctx.storedConfig.TVOCBaseline = 0
+
+	if err := ctx.loadStoredConfig(); err != nil {
+		t.Error(err)
+	}
+
+	if ctx.storedConfig.ECO2Baseline != 1 {
+		t.Error("unexpected eco2", 1, ctx.storedConfig.ECO2Baseline)
+	}
+
+	if ctx.storedConfig.TVOCBaseline != 2 {
+		t.Error("unexpected tvoc", 2, ctx.storedConfig.TVOCBaseline)
 	}
 }

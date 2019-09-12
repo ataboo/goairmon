@@ -1,64 +1,65 @@
 package hardware
 
-import "fmt"
+import (
+	"goairmon/business/data/context"
+	"runtime"
 
-type Co2Sensor interface {
-	IsOn() bool
-	On() error
-	Off() error
-	Read() (float64, error)
-	Close()
+	"github.com/ataboo/spg30go/sensor"
+	"github.com/op/go-logging"
+)
+
+type SGP30 interface {
+	Init() error
+	Close() error
+	Measure() (eCO2 uint16, TVOC uint16, err error)
+	GetBaseline() (eCO2 uint16, TVOC uint16, err error)
+	SetBaseline(eCO2 uint16, TVOC uint16) error
 }
 
 type Co2SensorCfg struct {
-	PinNumber uint
+	ReadDelayMillis       int
+	CalibrateDelaySeconds int
+	dbContext             context.DbContext
 }
 
-func NewPiCo2Sensor(cfg *Co2SensorCfg) Co2Sensor {
-	sensor := &piCo2Sensor{
-		cfg: cfg,
+func NewPiCo2Sensor(cfg *Co2SensorCfg) *Co2Sensor {
+	var sgp30 *sensor.SGP30Sensor
+
+	if runtime.GOARCH == "arm" {
+		sensorCfg := sensor.DefaultConfig()
+		sensorCfg.Logger = logging.MustGetLogger("goairmon-spg30")
+		sgp30 = sensor.NewSensor(sensorCfg)
+	} else {
+		sgp30 = fakeSgp30Sensor
 	}
 
-	if err := sensor.init(); err != nil {
-		fmt.Println("failed to init piCo2Sensor")
-		return nil
+	sensor := &Co2Sensor{
+		cfg:   cfg,
+		sgp30: sgp30,
 	}
 
 	return sensor
 }
 
-type piCo2Sensor struct {
-	cfg    *Co2SensorCfg
-	active bool
+type Co2Sensor struct {
+	cfg   *Co2SensorCfg
+	sgp30 SGP30
 }
 
-func (s *piCo2Sensor) init() error {
-	//
-	return nil
-}
-
-func (s *piCo2Sensor) On() error {
-	s.active = true
-
-	return nil
-}
-
-func (s *piCo2Sensor) Off() error {
-	s.active = false
+func (s *Co2Sensor) Start() error {
+	if err := s.sgp30.Init(); err != nil {
+		return err
+	}
 
 	return nil
 }
 
-func (s *piCo2Sensor) IsOn() bool {
-	return s.active
-}
-
-func (s *piCo2Sensor) Read() (float64, error) {
+func (s *Co2Sensor) Co2Value() (float64, error) {
 	//
 
 	return 0, nil
 }
 
-func (s *piCo2Sensor) Close() {
-	//
+func (s *Co2Sensor) Close() {
+	s.sgp30.Close()
 }
