@@ -1,12 +1,17 @@
 package hardware
 
 import (
+	"fmt"
 	"goairmon/business/data/context"
 	"runtime"
+	"sync"
+	"time"
 
 	"github.com/ataboo/spg30go/sensor"
 	"github.com/op/go-logging"
 )
+
+var logger = logging.MustGetLogger("goairmon")
 
 type SGP30 interface {
 	Init() error
@@ -17,49 +22,119 @@ type SGP30 interface {
 }
 
 type Co2SensorCfg struct {
-	ReadDelayMillis       int
-	CalibrateDelaySeconds int
-	dbContext             context.DbContext
+	ReadDelayMillis      int
+	BaselineDelaySeconds int
 }
 
-func NewPiCo2Sensor(cfg *Co2SensorCfg) *Co2Sensor {
-	var sgp30 *sensor.SGP30Sensor
+func NewPiCo2Sensor(cfg *Co2SensorCfg, dbContext context.DbContext) *Co2Sensor {
+	co2Sensor := &Co2Sensor{
+		cfg:       cfg,
+		dbContext: dbContext,
+	}
 
 	if runtime.GOARCH == "arm" {
 		sensorCfg := sensor.DefaultConfig()
-		sensorCfg.Logger = logging.MustGetLogger("goairmon-spg30")
-		sgp30 = sensor.NewSensor(sensorCfg)
+		sensorCfg.Logger = logger
+		co2Sensor.sgp30 = sensor.NewSensor(sensorCfg)
 	} else {
-		sgp30 = fakeSgp30Sensor
+		co2Sensor.sgp30 = newFakeSgp30Sensor()
 	}
 
-	sensor := &Co2Sensor{
-		cfg:   cfg,
-		sgp30: sgp30,
-	}
-
-	return sensor
+	return co2Sensor
 }
 
 type Co2Sensor struct {
-	cfg   *Co2SensorCfg
-	sgp30 SGP30
+	cfg       *Co2SensorCfg
+	sgp30     SGP30
+	stopChan  chan int
+	lock      sync.Mutex
+	ECO2      uint16
+	TVOC      uint16
+	dbContext context.DbContext
 }
 
 func (s *Co2Sensor) Start() error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	if s.stopChan != nil {
+		return fmt.Errorf("sensor already started")
+	}
+
 	if err := s.sgp30.Init(); err != nil {
 		return err
 	}
 
+	s.applySavedSensorBaseline()
+
+	s.stopChan = make(chan int)
+	readTicker := time.NewTicker(time.Millisecond * time.Duration(s.cfg.ReadDelayMillis))
+	baselineTicker := time.NewTicker(time.Second * time.Duration(s.cfg.BaselineDelaySeconds))
+	go s.loopRoutine(readTicker, baselineTicker)
+
 	return nil
 }
 
-func (s *Co2Sensor) Co2Value() (float64, error) {
-	//
+func (s *Co2Sensor) applySavedSensorBaseline() {
+	eCO2, TVOC, err := s.dbContext.GetSensorBaseline()
+	if err != nil {
+		logger.Error("failed to load saved sensor baseline", err)
+	}
 
-	return 0, nil
+	if eCO2 > 0 && TVOC > 0 {
+		if err := s.sgp30.SetBaseline(eCO2, TVOC); err != nil {
+			logger.Error("failed to set sgp30 baseline", err)
+		}
+	}
 }
 
-func (s *Co2Sensor) Close() {
-	s.sgp30.Close()
+func (s *Co2Sensor) loopRoutine(readTicker *time.Ticker, baseLineTicker *time.Ticker) {
+	defer func() {
+		readTicker.Stop()
+		baseLineTicker.Stop()
+	}()
+
+	for {
+		select {
+		case <-s.stopChan:
+			return
+		case <-readTicker.C:
+			eCO2, TVOC, err := s.sgp30.Measure()
+			if err != nil {
+				logger.Error("failed to measure", err)
+			}
+			s.ECO2 = eCO2
+			s.TVOC = TVOC
+		case <-baseLineTicker.C:
+			eCO2, TVOC, err := s.sgp30.GetBaseline()
+			if err != nil {
+				logger.Error("failed to get baseline", err)
+			} else {
+				if err := s.dbContext.SetSensorBaseline(eCO2, TVOC); err != nil {
+					logger.Error(err)
+				}
+			}
+		}
+	}
+}
+
+func (s *Co2Sensor) Close() error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	if s.stopChan == nil {
+		return fmt.Errorf("sensor already stopped")
+	}
+
+	select {
+	case s.stopChan <- 0:
+		break
+	case <-time.After(time.Millisecond * 100):
+		logger.Error("co2sensor stop signal timed out")
+		break
+	}
+
+	s.stopChan = nil
+
+	return s.sgp30.Close()
 }

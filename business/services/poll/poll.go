@@ -7,36 +7,38 @@ import (
 	"goairmon/business/hardware"
 	"sync"
 	"time"
+
+	"github.com/op/go-logging"
 )
 
-func NewPollService(cfg *Config) *PollService {
-	sensorCfg := &hardware.Co2SensorCfg{}
+var logger = logging.MustGetLogger("goairmon")
 
-	var co2Sensor hardware.Co2Sensor
-	if cfg.PiSensor {
-		co2Sensor = hardware.NewPiCo2Sensor(sensorCfg)
-	} else {
-		co2Sensor = hardware.NewFakeCo2Sensor(sensorCfg)
+func NewPollService(cfg *Config, dbContext context.DbContext) *PollService {
+	sensorCfg := &hardware.Co2SensorCfg{
+		ReadDelayMillis:      1000,
+		BaselineDelaySeconds: 60,
 	}
+	co2Sensor := hardware.NewPiCo2Sensor(sensorCfg, dbContext)
 
 	return &PollService{
 		cfg:       cfg,
 		co2Sensor: co2Sensor,
 		stopChan:  nil,
+		dbContext: dbContext,
 	}
 }
 
 type PollService struct {
+	dbContext context.DbContext
 	stopChan  chan int
 	lock      sync.Mutex
 	cfg       *Config
-	co2Sensor hardware.Co2Sensor
+	co2Sensor *hardware.Co2Sensor
 }
 
 type Config struct {
 	TickMillis int
 	PiSensor   bool
-	DbContext  context.DbContext
 }
 
 func (p *PollService) Start() error {
@@ -49,11 +51,8 @@ func (p *PollService) Start() error {
 
 	p.stopChan = make(chan int)
 
-	go p.pollRoutine()
-
-	if err := p.co2Sensor.On(); err != nil {
-		return err
-	}
+	ticker := time.NewTicker(time.Millisecond * time.Duration(p.cfg.TickMillis))
+	go p.pollRoutine(ticker)
 
 	return nil
 }
@@ -68,27 +67,29 @@ func (p *PollService) Stop() error {
 
 	select {
 	case p.stopChan <- 0:
-		//
+		break
 	case <-time.After(time.Millisecond * 100):
-		//
+		break
 	}
 
-	if err := p.co2Sensor.Off(); err != nil {
+	if err := p.co2Sensor.Close(); err != nil {
 		return err
 	}
+
+	p.stopChan = nil
 
 	return nil
 }
 
-func (p *PollService) pollRoutine() {
-	ticker := time.NewTicker(time.Millisecond * time.Duration(p.cfg.TickMillis))
-
+func (p *PollService) pollRoutine(pollTicker *time.Ticker) {
 	for {
 		select {
 		case <-p.stopChan:
 			return
-		case <-ticker.C:
-			p.takePoll()
+		case <-pollTicker.C:
+			if err := p.takePoll(); err != nil {
+				logger.Error("failed to poll sensor", err)
+			}
 		}
 	}
 }
@@ -97,12 +98,5 @@ func (p *PollService) takePoll() error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	val, err := p.co2Sensor.Read()
-	if err != nil {
-		return err
-	}
-
-	p.cfg.DbContext.PushSensorPoint(&models.SensorPoint{Time: time.Now(), Co2Value: val})
-
-	return err
+	return p.dbContext.PushSensorPoint(&models.SensorPoint{Time: time.Now(), Co2Value: float64(p.co2Sensor.ECO2)})
 }
