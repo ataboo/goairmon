@@ -37,8 +37,7 @@ type PollService struct {
 }
 
 type Config struct {
-	TickMillis int
-	PiSensor   bool
+	PollDelayMillis int
 }
 
 func (p *PollService) Start() error {
@@ -49,9 +48,13 @@ func (p *PollService) Start() error {
 		return fmt.Errorf("service already started")
 	}
 
+	if err := p.co2Sensor.Start(); err != nil {
+		return err
+	}
+
 	p.stopChan = make(chan int)
 
-	ticker := time.NewTicker(time.Millisecond * time.Duration(p.cfg.TickMillis))
+	ticker := time.NewTicker(time.Millisecond * time.Duration(p.cfg.PollDelayMillis))
 	go p.pollRoutine(ticker)
 
 	return nil
@@ -82,6 +85,8 @@ func (p *PollService) Stop() error {
 }
 
 func (p *PollService) pollRoutine(pollTicker *time.Ticker) {
+	defer pollTicker.Stop()
+
 	for {
 		select {
 		case <-p.stopChan:
@@ -98,5 +103,10 @@ func (p *PollService) takePoll() error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	return p.dbContext.PushSensorPoint(&models.SensorPoint{Time: time.Now(), Co2Value: float64(p.co2Sensor.ECO2)})
+	err := p.dbContext.PushSensorPoint(&models.SensorPoint{Time: time.Now(), Co2Value: float64(p.co2Sensor.ECO2)})
+	if err != nil {
+		return err
+	}
+
+	return p.dbContext.Save()
 }

@@ -18,6 +18,7 @@ func main() {
 		AppCookieKey:          helper.MustGetEnv("APP_COOKIE_KEY"),
 		CookieStoreEncryption: helper.MustGetEnv("COOKIE_STORE_ENCRYPTION"),
 		StoragePath:           helper.MustGetEnv("STORAGE_PATH"),
+		SensorPointCount:      48 * 60,
 	}
 
 	server := site.NewSite(serverCfg)

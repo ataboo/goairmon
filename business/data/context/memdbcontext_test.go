@@ -1,6 +1,7 @@
 package context
 
 import (
+	"encoding/json"
 	"goairmon/business/data/models"
 	"goairmon/site/helper"
 	"io/ioutil"
@@ -347,5 +348,50 @@ func TestSaveSensorBaseline(t *testing.T) {
 
 	if ctx.storedConfig.TVOCBaseline != 2 {
 		t.Error("unexpected tvoc", 2, ctx.storedConfig.TVOCBaseline)
+	}
+}
+
+func TestArchiveLastDay(t *testing.T) {
+	ctx := _setupMemDbContext(t)
+	ctx.cfg.SensorPointCount = 24 * 60 * 2
+
+	ctx.sensorPoints = NewSensorPointStack(ctx.cfg.SensorPointCount)
+	err := ctx.archiveLastDay()
+	if err == nil {
+		t.Error("expected error")
+	}
+
+	for i := 0; i < 24*60*2; i++ {
+		ctx.sensorPoints.Push(&models.SensorPoint{
+			Time:     time.Date(2010, 01, 01, 00, 00, 00, 00, time.UTC).Add(time.Minute * time.Duration(i)),
+			Co2Value: 23,
+		})
+	}
+
+	if err := ctx.PushSensorPoint(&models.SensorPoint{
+		Time:     time.Date(2010, 1, 3, 0, 0, 0, 0, time.UTC),
+		Co2Value: 23,
+	}); err != nil {
+		t.Error("unexpected error", err)
+	}
+
+	loaded, err := ioutil.ReadFile(ctx.cfg.StoragePath + "/archive_2010_01_02.json")
+	if err != nil {
+		t.Error("unexpected error", err)
+	}
+
+	var decoded []*models.SensorPoint
+	if err := json.Unmarshal(loaded, &decoded); err != nil {
+		t.Error("unexpected error", err)
+	}
+
+	if len(decoded) != 24*60-1 {
+		t.Error("unexpected count", 24*60-1, len(decoded))
+	}
+
+	for _, p := range decoded {
+		if p.Time.YearDay() != 2 {
+			t.Error("values should be from Jan 2", p)
+		}
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"goairmon/business/data/context"
 	"goairmon/business/services/flash"
 	"goairmon/business/services/identity"
+	"goairmon/business/services/poll"
 	"goairmon/business/services/provider"
 	"goairmon/business/services/viewloader"
 	"goairmon/site/controllers"
@@ -13,7 +14,10 @@ import (
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
 	echomiddleware "github.com/labstack/echo/middleware"
+	"github.com/op/go-logging"
 )
+
+var logger = logging.MustGetLogger("goairmon")
 
 func NewSite(cfg *Config) *Site {
 	identityService := identity.NewIdentityService(&identity.IdentityConfig{
@@ -68,9 +72,16 @@ func (s *Site) bindGlobalMiddleware(cfg *Config) {
 		EncodeReadible:   cfg.EncodeReadible,
 	})
 
+	pollCfg := &poll.Config{PollDelayMillis: 60 * 1000}
+	poll := poll.NewPollService(pollCfg, dbContext)
+	if err := poll.Start(); err != nil {
+		logger.Info("failed to start sensor poll", err)
+	}
+
 	provider.Register(viewloader.CtxKey, &viewloader.ViewLoader{})
 	provider.Register(helper.CtxFlashServiceKey, flashService)
 	provider.Register(helper.CtxDbContext, dbContext)
+	provider.Register(helper.CtxSensorPoll, poll)
 
 	s.echoServer.Use(echomiddleware.Logger())
 	// s.echoServer.Use(echomiddleware.Recover())
@@ -80,7 +91,6 @@ func (s *Site) bindGlobalMiddleware(cfg *Config) {
 	s.echoServer.Use(middleware.CSRFWithConfig(middleware.CSRFConfig{
 		TokenLookup: "form:_csrf-token",
 	}))
-
 }
 
 func (s *Site) bindActions() {

@@ -10,6 +10,7 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo"
+	"github.com/op/go-logging"
 )
 
 func AuthController(server *echo.Echo, identity *identity.IdentityService) *echo.Group {
@@ -27,6 +28,8 @@ func AuthController(server *echo.Echo, identity *identity.IdentityService) *echo
 			view := loadView("auth/login.gohtml", c)
 			vm := models.NewContextVm(c, loginVM)
 			vm.Errors["general"] = "Failed to log in"
+
+			logging.MustGetLogger("goairmon").Error(err)
 
 			return view.Execute(c.Response().Writer, vm)
 		}

@@ -33,10 +33,12 @@ func NewPiCo2Sensor(cfg *Co2SensorCfg, dbContext context.DbContext) *Co2Sensor {
 	}
 
 	if runtime.GOARCH == "arm" {
+		logger.Info("Detected arm, starting i2c sensor")
 		sensorCfg := sensor.DefaultConfig()
 		sensorCfg.Logger = logger
 		co2Sensor.sgp30 = sensor.NewSensor(sensorCfg)
 	} else {
+		logger.Info("Detected non-arm, starting fake sensor values")
 		co2Sensor.sgp30 = newFakeSgp30Sensor()
 	}
 

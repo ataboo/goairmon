@@ -11,9 +11,16 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
+	"github.com/op/go-logging"
 )
 
+var logger = logging.MustGetLogger("goairmon")
+
 func NewMemDbContext(cfg *MemDbConfig) DbContext {
+	if cfg.SensorPointCount == 0 {
+		cfg.SensorPointCount = 48 * 60
+	}
+
 	ctx := &memDbContext{
 		cfg:          cfg,
 		sensorPoints: NewSensorPointStack(cfg.SensorPointCount),
@@ -151,7 +158,7 @@ func (m *memDbContext) loadStoredConfig() error {
 		return fmt.Errorf("failed to read stored config: %s", err)
 	}
 
-	if err := json.Unmarshal(raw, m.storedConfig); err != nil {
+	if err := json.Unmarshal(raw, &m.storedConfig); err != nil {
 		return fmt.Errorf("failed to decode stored config: %s", err)
 	}
 
@@ -198,7 +205,52 @@ func (m *memDbContext) PushSensorPoint(point *models.SensorPoint) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
+	lastPoint := m.sensorPoints.Peak(0)
+	if lastPoint != nil && lastPoint.Time.Day() != point.Time.Day() {
+		if err := m.archiveLastDay(); err != nil {
+			logger.Error(err)
+		}
+
+	}
+
 	m.sensorPoints.Push(point)
+
+	return nil
+}
+
+func (m *memDbContext) archiveLastDay() error {
+	daysPoints, err := m.sensorPoints.PeakNLatest(60 * 24)
+	if err != nil {
+		return err
+	}
+
+	if len(daysPoints) == 0 || daysPoints[0] == nil {
+		return fmt.Errorf("not enough points saved")
+	}
+
+	year := daysPoints[0].Time.Year()
+	day := daysPoints[0].Time.YearDay()
+
+	for i := len(daysPoints) - 1; i >= 0; i-- {
+		point := daysPoints[i]
+		if point == nil || point.Time.YearDay() != day || point.Time.Year() != year {
+			continue
+		}
+
+		daysPoints = daysPoints[:i]
+		break
+	}
+
+	encoded, err := json.Marshal(daysPoints)
+	if err != nil {
+		return err
+	}
+
+	fileName := fmt.Sprintf("/archive_%d_%02d_%02d.json", daysPoints[0].Time.Year(), daysPoints[0].Time.Month(), daysPoints[0].Time.Day())
+	os.MkdirAll(m.cfg.StoragePath, 0700)
+	if err := ioutil.WriteFile(m.cfg.StoragePath+fileName, encoded, 0644); err != nil {
+		return fmt.Errorf("failed to write archive: %s", err)
+	}
 
 	return nil
 }
@@ -224,4 +276,9 @@ func (m *memDbContext) SetSensorBaseline(eCO2 uint16, TVOC uint16) error {
 	m.storedConfig.TVOCBaseline = TVOC
 
 	return nil
+}
+
+func (m *memDbContext) Save() error {
+	m.saveStoredConfig()
+	return m.savePoints()
 }

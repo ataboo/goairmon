@@ -75,8 +75,11 @@ func (s *sensorPointStack) Encode() ([]byte, error) {
 }
 
 func (s *sensorPointStack) Decode(raw []byte) error {
-	err := json.Unmarshal(raw, s)
-	s.size = len(s.Values)
+	var decoded []*models.SensorPoint
+	err := json.Unmarshal(raw, &decoded)
+
+	s.Values = make([]*models.SensorPoint, s.size)
+	copy(s.Values, decoded)
 
 	return err
 }

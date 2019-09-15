@@ -16,4 +16,5 @@ type DbContext interface {
 	GetSensorPoints(count int) ([]*models.SensorPoint, error)
 	GetSensorBaseline() (eCO2 uint16, TVOC uint16, err error)
 	SetSensorBaseline(eCO2 uint16, TVOC uint16) error
+	Save() error
 }

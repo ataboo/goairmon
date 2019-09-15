@@ -6,4 +6,5 @@ const (
 	CtxCookieSession   = "cookie_session"
 	CtxFlashMessages   = "flash_messages"
 	CtxDbContext       = "db_context"
+	CtxSensorPoll      = "sensor_poll"
 )
