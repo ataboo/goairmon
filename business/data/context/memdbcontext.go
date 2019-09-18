@@ -145,7 +145,7 @@ func (m *memDbContext) loadPoints() error {
 		return fmt.Errorf("failed to read point storage: %s", err)
 	}
 
-	if err := m.sensorPoints.Decode(raw); err != nil {
+	if err := json.Unmarshal(raw, m.sensorPoints); err != nil {
 		return fmt.Errorf("failed to decode point storage: %s", err)
 	}
 
@@ -180,7 +180,7 @@ func (m *memDbContext) saveStoredConfig() error {
 }
 
 func (m *memDbContext) savePoints() error {
-	raw, err := m.sensorPoints.Encode()
+	raw, err := json.Marshal(m.sensorPoints)
 	if err != nil {
 		return fmt.Errorf("failed to marshal sensor points: %s", err)
 	}
@@ -259,7 +259,20 @@ func (m *memDbContext) GetSensorPoints(count int) ([]*models.SensorPoint, error)
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	return m.sensorPoints.PeakNLatest(count)
+	out := make([]*models.SensorPoint, 0)
+
+	points, err := m.sensorPoints.PeakNLatest(count)
+	if err != nil {
+		return out, err
+	}
+
+	for _, p := range points {
+		if p != nil {
+			out = append(out, p)
+		}
+	}
+
+	return out, nil
 }
 
 func (m *memDbContext) GetSensorBaseline() (eCO2 uint16, TVOC uint16, err error) {

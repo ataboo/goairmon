@@ -114,59 +114,6 @@ func TestNewSensorPointStack(t *testing.T) {
 	}
 }
 
-func TestEncodeDecode(t *testing.T) {
-	stack := NewSensorPointStack(4)
-	downcast := stack.(*sensorPointStack)
-
-	points := []*models.SensorPoint{
-		{Co2Value: 1.0, Time: time.Date(2010, 1, 1, 0, 0, 0, 0, time.UTC)},
-		{Co2Value: 2.0, Time: time.Date(2011, 1, 1, 0, 0, 0, 0, time.UTC)},
-		{Co2Value: 3.0, Time: time.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC)},
-	}
-
-	for _, p := range points {
-		stack.Push(p)
-	}
-
-	rawEncoded, err := stack.Encode()
-	if err != nil {
-		t.Error(err)
-	}
-
-	decoded := NewSensorPointStack(0)
-	if err := decoded.Decode(rawEncoded); err != nil {
-		t.Error(err)
-	}
-
-	decodedDowncast := decoded.(*sensorPointStack)
-
-	if downcast.Index != decodedDowncast.Index {
-		t.Error("unexpected index", downcast.Index, decodedDowncast.Index)
-	}
-
-	if downcast.size != decodedDowncast.size {
-		t.Error("unexpected size", downcast.size, decodedDowncast.size)
-	}
-
-	for i, v := range downcast.Values {
-		if v == nil {
-			if downcast.Values[i] != nil {
-				t.Error("expected nil", downcast.Values[i])
-			}
-			continue
-		}
-
-		if v.Co2Value != decodedDowncast.Values[i].Co2Value {
-			t.Error("co2value mismatch", v.Co2Value, decodedDowncast.Values[i].Co2Value)
-		}
-
-		if v.Time != decodedDowncast.Values[i].Time {
-			t.Error("time mismatch", v.Time, decodedDowncast.Values[i].Time)
-		}
-	}
-
-}
-
 func TestPeakNLatest(t *testing.T) {
 	stack := NewSensorPointStack(4)
 	// downcast := stack.(*sensorPointStack)

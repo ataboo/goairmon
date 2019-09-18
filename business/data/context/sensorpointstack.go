@@ -1,7 +1,6 @@
 package context
 
 import (
-	"encoding/json"
 	"fmt"
 	"goairmon/business/data/models"
 )
@@ -10,8 +9,6 @@ type PointStack interface {
 	Push(point *models.SensorPoint)
 	Peak(idx int) *models.SensorPoint
 	PeakNLatest(count int) ([]*models.SensorPoint, error)
-	Encode() ([]byte, error)
-	Decode(raw []byte) error
 	Pop() *models.SensorPoint
 	Size() int
 	Clear()
@@ -68,20 +65,6 @@ func (s *sensorPointStack) PeakNLatest(count int) ([]*models.SensorPoint, error)
 
 func (s *sensorPointStack) Size() int {
 	return s.size
-}
-
-func (s *sensorPointStack) Encode() ([]byte, error) {
-	return json.Marshal(s)
-}
-
-func (s *sensorPointStack) Decode(raw []byte) error {
-	var decoded []*models.SensorPoint
-	err := json.Unmarshal(raw, &decoded)
-
-	s.Values = make([]*models.SensorPoint, s.size)
-	copy(s.Values, decoded)
-
-	return err
 }
 
 func (s *sensorPointStack) Clear() {

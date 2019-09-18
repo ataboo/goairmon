@@ -11,15 +11,20 @@
         var ctx = document.getElementById('myChart');
         var options = {
             responsive: false
-        }
-        var data = {{graphJsData}}
+        };
+        //var data = {{graphJsData}}
 
-        var myChart = new Chart(ctx, {
+        var pointsRaw = {{graphJsData}};
+
+        var points = JSON.parse(pointsRaw);
+
+        /*var myChart = new Chart(ctx, {
             type: 'line',
             data: data,
             options: {
                 responsive: false
             }
-        });
+        });*/
+        
     </script>
 {{end}}

@@ -1,10 +1,10 @@
 package viewloader
 
 import (
+	"encoding/json"
 	"fmt"
 	"goairmon/business/data/context"
 	"goairmon/site/helper"
-	"goairmon/site/models"
 	"html/template"
 	"log"
 	"path/filepath"
@@ -37,16 +37,18 @@ func (v *ViewLoader) LoadView(viewPath string, c echo.Context) *template.Templat
 	files := append(v.layoutFilenames(), fullViewPath(viewPath))
 
 	mainTemplate = mainTemplate.Funcs(template.FuncMap{
-		"graphJsData": func() template.HTML {
+		"graphJsData": func() string {
 			points, err := c.Get(helper.CtxDbContext).(context.DbContext).GetSensorPoints(48 * 60)
 			if err != nil {
 				log.Println(err)
 			}
-			model := models.GraphVm{
-				SensorPoints: points,
+
+			raw, err := json.Marshal(points)
+			if err != nil {
+				log.Println(err)
 			}
 
-			return model.GraphJsData()
+			return string(raw)
 		},
 	})
 
