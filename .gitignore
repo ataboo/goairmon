@@ -1,5 +1,5 @@
 .vscode
-goairmon
+./goairmon
 .env
 debug
 package.json
