@@ -18,7 +18,7 @@ type ViewLoader struct {
 }
 
 func fullViewPath(viewPath string) string {
-	return helper.SiteRoot() + "/views/" + viewPath
+	return helper.ResourceRoot() + "/views/" + viewPath
 }
 
 func (v *ViewLoader) layoutFilenames() []string {

@@ -155,7 +155,7 @@ func TestSaveAndLoad(t *testing.T) {
 		t.Error("unexpected point count", 1, len(points))
 	}
 
-	if points[0].Time != point.Time || points[0].Co2Value != point.Co2Value {
+	if !points[0].Time.Equal(point.Time) || points[0].Co2Value != point.Co2Value {
 		t.Error("point mismatch", points[0], point)
 	}
 }

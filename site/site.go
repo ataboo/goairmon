@@ -94,8 +94,8 @@ func (s *Site) bindGlobalMiddleware(cfg *Config) {
 }
 
 func (s *Site) bindActions() {
-	s.echoServer.Static("/static", "site/assets")
-	s.echoServer.File("favicon.ico", "site/assets/imgs/favicon.ico")
+	s.echoServer.Static("/static", "resources/assets")
+	s.echoServer.File("favicon.ico", "resources/assets/imgs/favicon.ico")
 
 	controllers.HomeController(s.echoServer, s.identityService)
 	controllers.AuthController(s.echoServer, s.identityService)

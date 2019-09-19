@@ -24,7 +24,7 @@ func (t *JsonTime) UnmarshalJSON(raw []byte) error {
 		return err
 	}
 
-	parsedTime := time.Unix(stamp, 0)
+	parsedTime := time.Unix(stamp, 0).In(time.UTC)
 
 	*t = JsonTime(parsedTime)
 

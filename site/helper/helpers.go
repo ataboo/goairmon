@@ -14,6 +14,10 @@ func MustGetEnv(key string) string {
 	return val
 }
 
+func ResourceRoot() string {
+	return AppRoot() + "/resources"
+}
+
 func BusinessRoot() string {
 	return AppRoot() + "/business"
 }
@@ -26,7 +30,7 @@ func AppRoot() string {
 	dir, _ := os.Getwd()
 	for i := 0; i < 10; i++ {
 
-		_, err := os.Stat(dir + "/site")
+		_, err := os.Stat(dir + "/.env")
 		if err == nil {
 			return dir
 		}

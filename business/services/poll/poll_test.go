@@ -124,3 +124,7 @@ func (f *_fakeDbContext) GetSensorBaseline() (eCO2 uint16, TVOC uint16, err erro
 func (f *_fakeDbContext) SetSensorBaseline(eCO2 uint16, TVOC uint16) error {
 	return f.setBaselineClosure(eCO2, TVOC)
 }
+
+func (f *_fakeDbContext) Save() error {
+	return nil
+}
