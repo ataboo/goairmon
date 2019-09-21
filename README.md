@@ -2,6 +2,8 @@
 
 An CO2 monitor using a raspberry pi and the SGP-30 eCO2/TVOC sensor.
 
+![Screenshot](screenshot.png)
+
 ## Sensor Setup
 
 - Enable I2C via `raspi-config`
