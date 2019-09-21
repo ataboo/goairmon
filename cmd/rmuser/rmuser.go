@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"goairmon/business/data/context"
 	"goairmon/site/helper"
+	"os"
 
 	"github.com/joho/godotenv"
 )
@@ -16,11 +17,13 @@ func main() {
 	flag.Parse()
 
 	if err := godotenv.Load(*envFilePath); err != nil {
-		panic("failed to load env file")
+		fmt.Println("failed to load env file")
+		os.Exit(1)
 	}
 
 	if *userName == "" {
-		panic("username must be provided")
+		fmt.Println("username must be provided")
+		os.Exit(1)
 	}
 
 	storagePath := helper.MustGetEnv("STORAGE_PATH")
@@ -32,11 +35,19 @@ func main() {
 
 	user, err := ctx.FindUserByName(*userName)
 	if err != nil {
-		panic("user not found")
+		fmt.Println("user not found")
+		os.Exit(1)
 	}
 
 	if err := ctx.DeleteUser(user.ID); err != nil {
 		fmt.Println("failed to delete user", err)
-		panic("exiting")
+		os.Exit(1)
 	}
+
+	if err := ctx.Save(); err != nil {
+		fmt.Println("failed to save context", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("Success!")
 }
