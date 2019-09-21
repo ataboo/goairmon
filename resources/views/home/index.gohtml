@@ -1,30 +1,51 @@
 {{define "title"}}Go Air Mon{{end}}
 {{define "content"}}
     <h1>Go Air Mon</h1>
-    <div class="chart-container" style="position: relative; height:40vh; width:80vw">
-        <canvas id="myChart" width="800" height="600"></canvas>
+    <div class="row">
+        <div class="col-md-8">
+            <div class="chart-container" style="">
+                <canvas id="myChart" width="800" height="600"></canvas>
+            </div>
+        </div>
     </div>
 
 
-    <script src="static/js/Chart.js"></script>
+    <script src="static/js/Chart.min.js"></script>
     <script>
-        var ctx = document.getElementById('myChart');
-        var options = {
-            responsive: false
-        };
-        //var data = {{graphJsData}}
-
-        var pointsRaw = {{graphJsData}};
-
-        var points = JSON.parse(pointsRaw);
-
-        /*var myChart = new Chart(ctx, {
-            type: 'line',
-            data: data,
-            options: {
+        $(document).ready(function() {
+            var ctx = document.getElementById('myChart');
+            var options = {
                 responsive: false
+            };
+            var pointsRaw = {{graphJsData}};
+            var points = JSON.parse(pointsRaw).reverse();
+            var data = [];
+            var labels = [];
+
+            for(i=0; i<points.length; i++) {
+                data[i] = {x: points[i].t, y: points[i].v};
+                labels[i] = moment(points[i].t, "X").calendar();
             }
-        });*/
-        
+
+            var myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: "CO2 Readings",
+                        data: data
+                    }]
+                },
+                options: {
+                    scales: {
+                        xAxes: [{
+                            ticks: {
+                                display: false
+                            }
+                        }]
+                    }
+                }
+            }); 
+        });
     </script>
 {{end}}

@@ -8,15 +8,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/op/go-logging"
+	"github.com/labstack/echo"
 )
-
-var logger = logging.MustGetLogger("goairmon")
 
 func NewPollService(cfg *Config, dbContext context.DbContext) *PollService {
 	sensorCfg := &hardware.Co2SensorCfg{
 		ReadDelayMillis:      1000,
 		BaselineDelaySeconds: 60,
+		Logger:               cfg.Logger,
 	}
 	co2Sensor := hardware.NewPiCo2Sensor(sensorCfg, dbContext)
 
@@ -38,6 +37,7 @@ type PollService struct {
 
 type Config struct {
 	PollDelayMillis int
+	Logger          echo.Logger
 }
 
 func (p *PollService) Start() error {
@@ -93,7 +93,7 @@ func (p *PollService) pollRoutine(pollTicker *time.Ticker) {
 			return
 		case <-pollTicker.C:
 			if err := p.takePoll(); err != nil {
-				logger.Error("failed to poll sensor", err)
+				p.cfg.Logger.Error("failed to poll sensor", err)
 			}
 		}
 	}

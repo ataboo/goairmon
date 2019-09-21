@@ -5,6 +5,7 @@ debug
 package.json
 node_modules
 console/adduser/adduser
+storage
 
 dist/*
 !dist/*.tar.gz

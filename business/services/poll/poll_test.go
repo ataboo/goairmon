@@ -6,11 +6,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/labstack/echo"
 )
 
 func TestPollStart(t *testing.T) {
 	cfg := &Config{
 		PollDelayMillis: 1000 * 60,
+		Logger:          echo.New().Logger,
 	}
 	ctx := &_fakeDbContext{
 		setBaselineClosure: func(eCO2 uint16, tVOC uint16) error {
@@ -56,7 +58,7 @@ func TestPollRoutine(t *testing.T) {
 		},
 	}
 
-	poll := NewPollService(&Config{}, ctx)
+	poll := NewPollService(&Config{Logger: echo.New().Logger}, ctx)
 
 	poll.stopChan = make(chan int)
 

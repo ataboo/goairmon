@@ -14,10 +14,7 @@ import (
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
 	echomiddleware "github.com/labstack/echo/middleware"
-	"github.com/op/go-logging"
 )
-
-var logger = logging.MustGetLogger("goairmon")
 
 func NewSite(cfg *Config) *Site {
 	identityService := identity.NewIdentityService(&identity.IdentityConfig{
@@ -70,12 +67,16 @@ func (s *Site) bindGlobalMiddleware(cfg *Config) {
 		StoragePath:      cfg.StoragePath,
 		SensorPointCount: cfg.SensorPointCount,
 		EncodeReadible:   cfg.EncodeReadible,
+		Logger:           s.echoServer.Logger,
 	})
 
-	pollCfg := &poll.Config{PollDelayMillis: 60 * 1000}
+	pollCfg := &poll.Config{
+		PollDelayMillis: 60 * 1000,
+		Logger:          s.echoServer.Logger,
+	}
 	poll := poll.NewPollService(pollCfg, dbContext)
 	if err := poll.Start(); err != nil {
-		logger.Info("failed to start sensor poll", err)
+		s.echoServer.Logger.Info("failed to start sensor poll", err.Error())
 	}
 
 	provider.Register(viewloader.CtxKey, &viewloader.ViewLoader{})

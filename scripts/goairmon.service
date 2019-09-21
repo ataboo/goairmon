@@ -1,0 +1,19 @@
+[Unit]
+Description=GoAirMon Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+
+Environment=WEB_PORT=80
+Environment=STORAGE_PATH=/usr/local/goairmon/storage
+ExecStart=/usr/local/goairmon/goairmon
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+WorkingDirectory=/usr/local/goairmon/
+
+[Install]
+WantedBy=multi-user.target

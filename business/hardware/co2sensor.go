@@ -7,11 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ataboo/spg30go/sensor"
-	"github.com/op/go-logging"
+	"github.com/ataboo/sgp30go/sensor"
+	"github.com/labstack/echo"
 )
-
-var logger = logging.MustGetLogger("goairmon")
 
 type SGP30 interface {
 	Init() error
@@ -24,6 +22,7 @@ type SGP30 interface {
 type Co2SensorCfg struct {
 	ReadDelayMillis      int
 	BaselineDelaySeconds int
+	Logger               echo.Logger
 }
 
 func NewPiCo2Sensor(cfg *Co2SensorCfg, dbContext context.DbContext) *Co2Sensor {
@@ -33,12 +32,12 @@ func NewPiCo2Sensor(cfg *Co2SensorCfg, dbContext context.DbContext) *Co2Sensor {
 	}
 
 	if runtime.GOARCH == "arm" {
-		logger.Info("Detected arm, starting i2c sensor")
+		cfg.Logger.Info("Detected arm, starting i2c sensor")
 		sensorCfg := sensor.DefaultConfig()
-		sensorCfg.Logger = logger
+		sensorCfg.Logger = NewLoggingAdaptor(cfg.Logger)
 		co2Sensor.sgp30 = sensor.NewSensor(sensorCfg)
 	} else {
-		logger.Info("Detected non-arm, starting fake sensor values")
+		cfg.Logger.Info("Detected non-arm, starting fake sensor values")
 		co2Sensor.sgp30 = newFakeSgp30Sensor()
 	}
 
@@ -80,12 +79,12 @@ func (s *Co2Sensor) Start() error {
 func (s *Co2Sensor) applySavedSensorBaseline() {
 	eCO2, TVOC, err := s.dbContext.GetSensorBaseline()
 	if err != nil {
-		logger.Error("failed to load saved sensor baseline", err)
+		s.cfg.Logger.Error("failed to load saved sensor baseline", err)
 	}
 
 	if eCO2 > 0 && TVOC > 0 {
 		if err := s.sgp30.SetBaseline(eCO2, TVOC); err != nil {
-			logger.Error("failed to set sgp30 baseline", err)
+			s.cfg.Logger.Error("failed to set sgp30 baseline", err)
 		}
 	}
 }
@@ -103,17 +102,17 @@ func (s *Co2Sensor) loopRoutine(readTicker *time.Ticker, baseLineTicker *time.Ti
 		case <-readTicker.C:
 			eCO2, TVOC, err := s.sgp30.Measure()
 			if err != nil {
-				logger.Error("failed to measure", err)
+				s.cfg.Logger.Error("failed to measure", err)
 			}
 			s.ECO2 = eCO2
 			s.TVOC = TVOC
 		case <-baseLineTicker.C:
 			eCO2, TVOC, err := s.sgp30.GetBaseline()
 			if err != nil {
-				logger.Error("failed to get baseline", err)
+				s.cfg.Logger.Error("failed to get baseline", err)
 			} else {
 				if err := s.dbContext.SetSensorBaseline(eCO2, TVOC); err != nil {
-					logger.Error(err)
+					s.cfg.Logger.Error(err)
 				}
 			}
 		}
@@ -132,7 +131,7 @@ func (s *Co2Sensor) Close() error {
 	case s.stopChan <- 0:
 		break
 	case <-time.After(time.Millisecond * 100):
-		logger.Error("co2sensor stop signal timed out")
+		s.cfg.Logger.Error("co2sensor stop signal timed out")
 		break
 	}
 

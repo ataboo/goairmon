@@ -1,7 +1,6 @@
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
-github.com/ataboo/goairmon v0.0.0-20190815005406-6f121bb2c420 h1:NXbz3hDl0QDlKK/g925TQqBLzStP7jtg1wTSst9vjLM=
-github.com/ataboo/spg30go v0.0.0-20190912021457-6431bd16d40c h1:CYpQN0LQ4RUmsRiCZcG765hbAM69LoQHVZonn9wJZtQ=
-github.com/ataboo/spg30go v0.0.0-20190912021457-6431bd16d40c/go.mod h1:uxDjyFqkAnjCJ0BnaJnVhktWITSG2CLrSmq5rymcCYw=
+github.com/ataboo/sgp30go v0.0.0-20190919044827-82ccb76f0d57 h1:+t9uMn/dfcrLyzMwHn21xJl3YS1v2LqTzKUSYw9kqn4=
+github.com/ataboo/sgp30go v0.0.0-20190919044827-82ccb76f0d57/go.mod h1:6rIu5DS6O3uER+xisLwg/WmytV8ffzkE/tl+EqmQTDY=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

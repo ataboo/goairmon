@@ -11,10 +11,8 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"github.com/op/go-logging"
+	"github.com/labstack/echo"
 )
-
-var logger = logging.MustGetLogger("goairmon")
 
 func NewMemDbContext(cfg *MemDbConfig) DbContext {
 	if cfg.SensorPointCount == 0 {
@@ -52,6 +50,7 @@ type MemDbConfig struct {
 	StoragePath      string
 	SensorPointCount int
 	EncodeReadible   bool
+	Logger           echo.Logger
 }
 
 type memDbContext struct {
@@ -208,7 +207,7 @@ func (m *memDbContext) PushSensorPoint(point *models.SensorPoint) error {
 	lastPoint := m.sensorPoints.Peak(0)
 	if lastPoint != nil && lastPoint.Time.Day() != point.Time.Day() {
 		if err := m.archiveLastDay(); err != nil {
-			logger.Error(err)
+			m.cfg.Logger.Error(err)
 		}
 
 	}

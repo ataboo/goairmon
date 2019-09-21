@@ -24,9 +24,12 @@ $(TARGETS): clean test
 	mkdir ${DIST_DIR}/cmd;
 	mkdir ${DIST_DIR}/storage;
 	mkdir -p ${DIST_DIR}/assets/config;
-	mkdir ${DIST_DIR}/bin;
 	cp ${PROJECT_DIR}/resources -r ${DIST_DIR};
-	cp ${PROJECT_DIR}/.env.example ${DIST_DIR}/.env;
+	cp ${PROJECT_DIR}/.env.prod ${DIST_DIR}/.env;
+	cp ${PROJECT_DIR}/scripts/install.sh ${DIST_DIR};
+	cp ${PROJECT_DIR}/scripts/uninstall.sh ${DIST_DIR};
+	cp ${PROJECT_DIR}/scripts/goairmon.service ${DIST_DIR};
+	
 
 	${ARCH_$@} go build ${LDFLAGS} -o ${DIST_DIR}/goairmon;
 	${ARCH_$@} go build ${LDFLAGS} -o ${DIST_DIR}/cmd/adduser ./cmd/adduser;

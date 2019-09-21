@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/labstack/echo"
 )
 
 func TestStartStop(t *testing.T) {
@@ -17,6 +18,7 @@ func TestStartStop(t *testing.T) {
 	cfg := &Co2SensorCfg{
 		ReadDelayMillis:      1000,
 		BaselineDelaySeconds: 30,
+		Logger:               echo.New().Logger,
 	}
 
 	dbContext := &_fakeDbContext{}
@@ -71,6 +73,7 @@ func TestLoopRoutine(t *testing.T) {
 	cfg := &Co2SensorCfg{
 		ReadDelayMillis:      1000,
 		BaselineDelaySeconds: 30,
+		Logger:               echo.New().Logger,
 	}
 
 	var eCO2Baseline uint16

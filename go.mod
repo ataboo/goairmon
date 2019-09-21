@@ -3,7 +3,7 @@ module goairmon
 go 1.12
 
 require (
-	github.com/ataboo/spg30go v0.0.0-20190912021457-6431bd16d40c
+	github.com/ataboo/sgp30go v0.0.0-20190919044827-82ccb76f0d57
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
 	github.com/google/uuid v1.1.1
 	github.com/gorilla/sessions v1.2.0
