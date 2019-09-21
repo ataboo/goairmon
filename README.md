@@ -1,6 +1,6 @@
 # goairmon
 
-An CO2 monitor using a raspberry pi and the SGP-30 eCO2/TVOC sensor.
+A web interface for a CO2 monitor on a raspberry pi using an SGP-30 eCO2/TVOC sensor.
 
 ![Screenshot](screenshot.png)
 
