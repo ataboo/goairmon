@@ -30,12 +30,9 @@ $(TARGETS): clean test
 	cp ${PROJECT_DIR}/scripts/uninstall.sh ${DIST_DIR};
 	cp ${PROJECT_DIR}/scripts/goairmon.service ${DIST_DIR};
 	
-
 	${ARCH_$@} go build ${LDFLAGS} -o ${DIST_DIR}/goairmon;
 	${ARCH_$@} go build ${LDFLAGS} -o ${DIST_DIR}/cmd/adduser ./cmd/adduser;
-
-	#cp scripts/install.sh scripts/uninstall.sh scripts/lasecap.service ${DIST_DIR}/bin
-	#cp scripts/start_hotspot.sh scripts/stop_hotspot.sh ${DIST_DIR}/bin
+	${ARCH_$@} go build ${LDFLAGS} -o ${DIST_DIR}/cmd/rmuser ./cmd/rmuser;
 
 	tar -czf ${DIST_DIR}/../goairmon-$@.tar.gz -C ${DIST_DIR}/ .
 
