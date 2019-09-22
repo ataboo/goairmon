@@ -186,3 +186,7 @@ func (f *_fakeDbContext) SetSensorBaseline(eCO2 uint16, TVOC uint16) error {
 func (f *_fakeDbContext) Save() error {
 	panic("not implemented")
 }
+
+func (f *_fakeDbContext) ClearSensorPoints() error {
+	panic("not implemented")
+}

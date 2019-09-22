@@ -3,7 +3,7 @@ package hardware
 import "testing"
 
 func TestFakeCo2SensorRead(t *testing.T) {
-	sensor := newFakeSgp30Sensor().(*fakeSgp30)
+	sensor := NewFakeSgp30Sensor().(*fakeSgp30)
 
 	for i := 0; i < 1000; i++ {
 		eCO2, TVOC, err := sensor.Measure()
