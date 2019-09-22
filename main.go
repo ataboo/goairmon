@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"goairmon/site"
-	"goairmon/site/helper"
 
 	"github.com/joho/godotenv"
 )
@@ -13,15 +12,7 @@ func main() {
 		panic("failed to load .env")
 	}
 
-	serverCfg := &site.Config{
-		Address:               helper.MustGetEnv("SERVER_ADDRESS"),
-		AppCookieKey:          helper.MustGetEnv("APP_COOKIE_KEY"),
-		CookieStoreEncryption: helper.MustGetEnv("COOKIE_STORE_ENCRYPTION"),
-		StoragePath:           helper.MustGetEnv("STORAGE_PATH"),
-		SensorPointCount:      48 * 60,
-	}
-
-	server := site.NewSite(serverCfg)
+	server := site.NewSite(site.EnvSiteConfig())
 	defer cleanup(server)
 
 	server.Start()

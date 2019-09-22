@@ -38,7 +38,7 @@ func NewPiCo2Sensor(cfg *Co2SensorCfg, dbContext context.DbContext) *Co2Sensor {
 		co2Sensor.sgp30 = sensor.NewSensor(sensorCfg)
 	} else {
 		cfg.Logger.Info("Detected non-arm, starting fake sensor values")
-		co2Sensor.sgp30 = newFakeSgp30Sensor()
+		co2Sensor.sgp30 = NewFakeSgp30Sensor()
 	}
 
 	return co2Sensor

@@ -1,6 +1,12 @@
 {{define "title"}}Go Air Mon{{end}}
 {{define "content"}}
     <h1>Go Air Mon</h1>
+    
+    <div class="flex-row">
+        <button class="btn btn-primary" id="btn-2-hour">2 Hour</button>
+        <button class="btn btn-primary" id="btn-48-hour">48 Hour</button>
+        <button class="btn btn-primary" id="btn-7-day">7 Day</button>
+    </div>
     <div class="row">
         <div class="col-md-8">
             <div class="chart-container" style="">
@@ -9,33 +15,36 @@
         </div>
     </div>
 
-
+    <script src="static/js/moment.min.js"></script>
     <script src="static/js/Chart.min.js"></script>
     <script>
         $(document).ready(function() {
-            var ctx = document.getElementById('myChart');
-            var options = {
-                responsive: false
-            };
-            var pointsRaw = {{graphJsData}};
-            var points = JSON.parse(pointsRaw).reverse();
-            var data = [];
-            var labels = [];
+            var points2Raw = {{points2Hours}};
+            var points48Raw = {{points48Hours}};
+            var points7Raw = {{points7Days}};
 
-            for(i=0; i<points.length; i++) {
-                data[i] = {x: points[i].t, y: points[i].v};
-                labels[i] = moment(points[i].t, "X").calendar();
-            }
+            function processRawPoints(rawJson) {
+                labels = [];
+                dataPoints = [];
 
-            var myChart = new Chart(ctx, {
-                type: 'line',
-                data: {
+                parsed = JSON.parse(rawJson).reverse();
+                for(i=0; i<parsed.length; i++) {
+                    dataPoints[i] = {x: parsed[i].t, y: parsed[i].v};
+                    labels[i] = moment(parsed[i].t, "X").calendar();
+                }
+
+                return {
                     labels: labels,
                     datasets: [{
                         label: "CO2 Readings",
-                        data: data
+                        data: dataPoints
                     }]
-                },
+                }
+            }
+
+            var ctx = document.getElementById('myChart');
+            var chart = new Chart(ctx, {
+                type: 'line',
                 options: {
                     scales: {
                         xAxes: [{
@@ -44,8 +53,44 @@
                             }
                         }]
                     }
-                }
-            }); 
+                },
+                data: [],
+            });
+
+            function show2Hour() {
+                $('btn-2-hour').toggleClass('active', true)
+                $('btn-48-hour').toggleClass('active', false)
+                $('btn-7-day').toggleClass('active', false)
+
+                chart.data = processRawPoints(points2Raw);
+                chart.update();
+            }
+
+            function show48Hour() {
+                var ctx = document.getElementById('myChart');
+                $('btn-2-hour').toggleClass('active', false)
+                $('btn-48-hour').toggleClass('active', true)
+                $('btn-7-day').toggleClass('active', false)
+
+                chart.data = processRawPoints(points48Raw);
+                chart.update();
+            }
+
+            function show7Day() {
+                var ctx = document.getElementById('myChart');
+                $('btn-2-hour').toggleClass('active', false)
+                $('btn-48-hour').toggleClass('active', false)
+                $('btn-7-day').toggleClass('active', true)
+
+                chart.data = processRawPoints(points7Raw);
+                chart.update();
+            }
+
+            show2Hour();
+
+            $('#btn-2-hour').click(show2Hour);
+            $('#btn-48-hour').click(show48Hour);
+            $('#btn-7-day').click(show7Day);
         });
     </script>
 {{end}}

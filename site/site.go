@@ -16,6 +16,16 @@ import (
 	echomiddleware "github.com/labstack/echo/middleware"
 )
 
+func EnvSiteConfig() *Config {
+	return &Config{
+		Address:               helper.MustGetEnv("SERVER_ADDRESS"),
+		AppCookieKey:          helper.MustGetEnv("APP_COOKIE_KEY"),
+		CookieStoreEncryption: helper.MustGetEnv("COOKIE_STORE_ENCRYPTION"),
+		StoragePath:           helper.MustGetEnv("STORAGE_PATH"),
+		SensorPointCount:      helper.MustGetEnvInt("SENSOR_POINT_COUNT"),
+	}
+}
+
 func NewSite(cfg *Config) *Site {
 	identityService := identity.NewIdentityService(&identity.IdentityConfig{
 		CookieStoreKeySession:    cfg.AppCookieKey,

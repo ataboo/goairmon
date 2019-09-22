@@ -10,7 +10,7 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-func newFakeSgp30Sensor() SGP30 {
+func NewFakeSgp30Sensor() SGP30 {
 	min := uint16(1)
 	max := uint16(1000)
 	last := float64((max-min)/2) + float64(min)

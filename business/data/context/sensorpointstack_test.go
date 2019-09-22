@@ -163,3 +163,9 @@ func TestPeakNLatest(t *testing.T) {
 		t.Error("unexpected result length", 4, len(result))
 	}
 }
+
+func TestResize(t *testing.T) {
+	stack := NewSensorPointStack(2000)
+	stack.Resize(100000)
+	stack.PeakNLatest(100000)
+}

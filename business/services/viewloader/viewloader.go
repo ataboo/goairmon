@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"goairmon/business/data/context"
 	"goairmon/site/helper"
+	vmodels "goairmon/site/models"
 	"html/template"
 	"log"
 	"path/filepath"
+	"time"
 
 	"github.com/labstack/echo"
 )
@@ -36,14 +38,39 @@ func (v *ViewLoader) LoadView(viewPath string, c echo.Context) *template.Templat
 	mainTemplate, _ = mainTemplate.Parse(`{{define "main"}} {{template "base" . }} {{end}}`)
 	files := append(v.layoutFilenames(), fullViewPath(viewPath))
 
+	var reducedSensorPoints *vmodels.ReducedSensorPoints
+
 	mainTemplate = mainTemplate.Funcs(template.FuncMap{
-		"graphJsData": func() string {
-			points, err := c.Get(helper.CtxDbContext).(context.DbContext).GetSensorPoints(48 * 60)
+		"points48Hours": func() string {
+			if reducedSensorPoints == nil {
+				reducedSensorPoints = v.initReducedSensorPoints(c)
+			}
+
+			raw, err := json.Marshal(reducedSensorPoints.Last48Hours())
 			if err != nil {
 				log.Println(err)
 			}
 
-			raw, err := json.Marshal(points)
+			return string(raw)
+		},
+		"points2Hours": func() string {
+			if reducedSensorPoints == nil {
+				reducedSensorPoints = v.initReducedSensorPoints(c)
+			}
+
+			raw, err := json.Marshal(reducedSensorPoints.Last2Hours())
+			if err != nil {
+				log.Println(err)
+			}
+
+			return string(raw)
+		},
+		"points7Days": func() string {
+			if reducedSensorPoints == nil {
+				reducedSensorPoints = v.initReducedSensorPoints(c)
+			}
+
+			raw, err := json.Marshal(reducedSensorPoints.Last7Days())
 			if err != nil {
 				log.Println(err)
 			}
@@ -58,4 +85,13 @@ func (v *ViewLoader) LoadView(viewPath string, c echo.Context) *template.Templat
 	}
 
 	return parsed
+}
+
+func (v *ViewLoader) initReducedSensorPoints(c echo.Context) *vmodels.ReducedSensorPoints {
+	points, err := c.Get(helper.CtxDbContext).(context.DbContext).GetSensorPoints(60 * 24 * 8)
+	if err != nil {
+		log.Println(err)
+	}
+
+	return vmodels.NewReducedSensorPoints(points, time.Now())
 }

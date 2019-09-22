@@ -148,6 +148,10 @@ func (m *memDbContext) loadPoints() error {
 		return fmt.Errorf("failed to decode point storage: %s", err)
 	}
 
+	if m.sensorPoints.Size() != m.cfg.SensorPointCount {
+		m.sensorPoints.Resize(m.cfg.SensorPointCount)
+	}
+
 	return nil
 }
 
@@ -209,7 +213,6 @@ func (m *memDbContext) PushSensorPoint(point *models.SensorPoint) error {
 		if err := m.archiveLastDay(); err != nil {
 			m.cfg.Logger.Error(err)
 		}
-
 	}
 
 	m.sensorPoints.Push(point)
@@ -272,6 +275,12 @@ func (m *memDbContext) GetSensorPoints(count int) ([]*models.SensorPoint, error)
 	}
 
 	return out, nil
+}
+
+func (m *memDbContext) ClearSensorPoints() error {
+	m.sensorPoints.Clear()
+
+	return m.savePoints()
 }
 
 func (m *memDbContext) GetSensorBaseline() (eCO2 uint16, TVOC uint16, err error) {

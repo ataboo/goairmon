@@ -11,6 +11,7 @@ type PointStack interface {
 	PeakNLatest(count int) ([]*models.SensorPoint, error)
 	Pop() *models.SensorPoint
 	Size() int
+	Resize(size int)
 	Clear()
 }
 
@@ -64,12 +65,30 @@ func (s *sensorPointStack) PeakNLatest(count int) ([]*models.SensorPoint, error)
 }
 
 func (s *sensorPointStack) Size() int {
-	return s.size
+	return len(s.Values)
+}
+
+func (s *sensorPointStack) Resize(size int) {
+	if size == s.Size() {
+		return
+	}
+
+	existingSize := s.size
+	if size < s.size {
+		existingSize = size
+	}
+	values, _ := s.PeakNLatest(existingSize)
+	s.size = size
+	s.Clear()
+
+	for _, point := range values {
+		s.Push(point)
+	}
 }
 
 func (s *sensorPointStack) Clear() {
 	s.Index = s.size - 1
-	s.Values = make([]*models.SensorPoint, s.size)
+	s.Values = make([]*models.SensorPoint, s.size, s.size)
 }
 
 func (s *sensorPointStack) normalizedIdx(idx int) int {

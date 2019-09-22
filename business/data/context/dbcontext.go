@@ -14,6 +14,7 @@ type DbContext interface {
 	DeleteUser(id uuid.UUID) error
 	PushSensorPoint(point *models.SensorPoint) error
 	GetSensorPoints(count int) ([]*models.SensorPoint, error)
+	ClearSensorPoints() error
 	GetSensorBaseline() (eCO2 uint16, TVOC uint16, err error)
 	SetSensorBaseline(eCO2 uint16, TVOC uint16) error
 	Save() error

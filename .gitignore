@@ -9,3 +9,8 @@ storage
 
 dist/*
 !dist/*.tar.gz
+
+__debug_bin
+adduser
+seedpoints
+goairmon
