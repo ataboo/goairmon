@@ -22,10 +22,7 @@ A web interface for a CO2 monitor on a raspberry pi using an SGP-30 eCO2/TVOC se
 
 ## Build From Source
 
-1. Install go
-2. Clone the project
-3. cd to the root and run `make`
-4. `dist` directory contains unzipped and tar balls. 
+Build [mage file](https://github.com/magefile/mage) `arm6` to output to the dist directory.
 
 ## Uninstall
 

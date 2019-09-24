@@ -243,6 +243,10 @@ func (m *memDbContext) archiveLastDay() error {
 		break
 	}
 
+	if len(daysPoints) == 0 {
+		return fmt.Errorf("not enough valid points")
+	}
+
 	encoded, err := json.Marshal(daysPoints)
 	if err != nil {
 		return err

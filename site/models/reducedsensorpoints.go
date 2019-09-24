@@ -92,7 +92,10 @@ func (p *ReducedSensorPoints) normalizeSensorData(rawPoints []*models.SensorPoin
 
 	rawIdx := 0
 	var refTime time.Time
-	nextRawPoint := rawPoints[rawIdx]
+	var nextRawPoint *models.SensorPoint
+	if len(rawPoints) > 0 {
+		nextRawPoint = rawPoints[0]
+	}
 
 	for i := 0; i < pointCount; i++ {
 		refTime = now.Add(-time.Minute * time.Duration(i))
