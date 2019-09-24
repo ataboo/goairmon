@@ -29,7 +29,7 @@
 
                 parsed = JSON.parse(rawJson).reverse();
                 for(i=0; i<parsed.length; i++) {
-                    dataPoints[i] = {x: parsed[i].t, y: parsed[i].v};
+                    dataPoints[i] = {x: parsed[i].t, y: parsed[i].v.toFixed(2)};
                     labels[i] = moment(parsed[i].t, "X").calendar();
                 }
 

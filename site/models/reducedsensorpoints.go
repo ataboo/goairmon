@@ -75,7 +75,7 @@ func (p *ReducedSensorPoints) Last2Hours() []*models.SensorPoint {
 
 func (p *ReducedSensorPoints) meanCo2Value(minPointIdx int, pointRange int) float64 {
 	sum := 0.0
-	for i := minPointIdx; i <= minPointIdx+pointRange; i++ {
+	for i := minPointIdx; i < minPointIdx+pointRange; i++ {
 		sum += p.pointData[i].Co2Value
 	}
 
@@ -97,13 +97,17 @@ func (p *ReducedSensorPoints) normalizeSensorData(rawPoints []*models.SensorPoin
 	for i := 0; i < pointCount; i++ {
 		refTime = now.Add(-time.Minute * time.Duration(i))
 
-		for rawIdx < len(rawPoints)-1 && nextRawPoint.Time.After(refTime) {
+		for nextRawPoint != nil && nextRawPoint.Time.After(refTime) {
 			rawIdx++
-			nextRawPoint = rawPoints[rawIdx]
+			if rawIdx >= len(rawPoints) {
+				nextRawPoint = nil
+			} else {
+				nextRawPoint = rawPoints[rawIdx]
+			}
 		}
 
 		co2Value := 400.0
-		if rawIdx < len(rawPoints) && nextRawPoint.Time.Add(time.Minute).After(refTime) {
+		if nextRawPoint != nil && nextRawPoint.Time.Add(time.Minute).After(refTime) {
 			co2Value = nextRawPoint.Co2Value
 		}
 
