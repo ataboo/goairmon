@@ -11,5 +11,5 @@ require (
 	github.com/labstack/echo v3.3.10+incompatible
 	github.com/labstack/gommon v0.2.9
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
-	golang.org/x/crypto v0.1.0
+	golang.org/x/crypto v0.17.0
 )
